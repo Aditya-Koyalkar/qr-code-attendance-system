@@ -176,33 +176,25 @@ app.get("/attendance/:id", async (req, res) => {
   res.json({ qrCode: attendance.qrCode });
 });
 app.get("/api/attendance/:attendanceId/verify", async (req, res) => {
-  console.log("hello");
   const { attendanceId } = req.params;
   const clientIp = req.ip;
-  console.log(clientIp);
   const deviceId = crypto
     .createHash("sha256")
     .update(req.headers["user-agent"] || "")
     .digest("hex");
-  console.log(deviceId);
   try {
     const attendance = await Attendance.findById(attendanceId);
     if (!attendance) return res.status(404).json({ success: false, message: "Attendance not found." });
-
-    // Check if device/IP is valid
     if (attendance.ipAddress !== clientIp) {
       return res.status(403).json({ success: false, message: "Must be on the same WiFi network!" });
     }
-    const attendanceTaken = await AttendanceLog.findOne({
-      $where: {
-        deviceId,
-      },
-    });
+    const attendanceTaken = await AttendanceLog.findOne({ attendanceId, deviceId });
     if (attendanceTaken) {
       return res.status(403).json({ success: false, message: "Attendance already marked" });
     }
     res.json({ success: true });
   } catch (error) {
+    console.log(error);
     res.status(500).json({ success: false, message: "Server error." });
   }
 });
@@ -216,6 +208,7 @@ app.get("/api/attendance/:attendanceId/students", async (req, res) => {
     const students = await Student.find({ classId: attendance.classId });
     res.json(students);
   } catch (error) {
+    console.log(error);
     res.status(500).json({ error: "Server error" });
   }
 });
