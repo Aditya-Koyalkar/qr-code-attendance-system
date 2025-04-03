@@ -35,7 +35,7 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-        <Route path="/mark-attendance" element={<MarkAttendance />} />
+        <Route path="/mark-attendance/:id" element={<MarkAttendance />} />
         <Route path="/" element={<>Hello</>} />
       </Routes>
     </Router>
