@@ -13,8 +13,8 @@
     "@babel/runtime": "^7.27.0",
     "@clerk/clerk-react": "^5.25.5",
     "axios": "^1.8.4",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
     "react-qr-scanner": "^1.0.0-alpha.11",
     "react-router-dom": "^7.4.1"
   },
