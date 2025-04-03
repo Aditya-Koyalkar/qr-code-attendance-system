@@ -33,6 +33,7 @@ const AttendanceSchema = new mongoose.Schema({
   date: { type: String, required: true },
   qrCode: String,
   ipAddress: { type: String, required: true }, // IP when QR was created
+  subnet: { type: String, required: true }, // IP when QR was created
 });
 
 const AttendanceLogSchema = new mongoose.Schema({
@@ -87,17 +88,32 @@ app.post("/api/students", async (req, res) => {
   res.json(newStudent);
 });
 
+const getLocalSubnet = () => {
+  const nets = networkInterfaces();
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name]) {
+      if (net.family === "IPv4" && !net.internal) {
+        const subnet = net.address.split(".").slice(0, 3).join(".") + ".0"; // Example: 192.168.1.0
+        return subnet;
+      }
+    }
+  }
+  return null;
+};
+
 app.post("/create-attendance", async (req, res) => {
   const { classId, date } = req.body;
 
   try {
-    const ip = req.ip;
+    const ip = requestIp.getClientIp(req);
+    const subnet = getLocalSubnet(); // Capture the local subnet
     const newAttendance = new Attendance({ classId, date });
     const frontend_url = process.env.FRONTEND_URL;
     const qrCodeUrl = `${frontend_url}/mark-attendance/${newAttendance._id}`;
     const qrCodeImage = await qr.toDataURL(qrCodeUrl);
     newAttendance.qrCode = qrCodeImage; // Store the QR in DB
     newAttendance.ipAddress = ip;
+    newAttendance.subnet = subnet;
     await newAttendance.save();
     res.json({ attendanceId: newAttendance._id, qrCode: qrCodeImage });
   } catch (error) {
@@ -105,6 +121,9 @@ app.post("/create-attendance", async (req, res) => {
   }
 });
 
+const isSameSubnet = (studentIp, storedSubnet) => {
+  return studentIp.startsWith(storedSubnet.split(".").slice(0, 3).join("."));
+};
 app.post("/api/mark-attendance/:attendanceId", async (req, res) => {
   const { attendanceId } = req.params;
   const { studentId } = req.body;
@@ -113,12 +132,16 @@ app.post("/api/mark-attendance/:attendanceId", async (req, res) => {
     .update(req.headers["user-agent"] || "")
     .digest("hex");
   // Get client's IP address
-  const clientIp = req.ip;
+  const clientIp = requestIp.getClientIp(req);
   try {
     // Get the attendance session
     const attendance = await Attendance.findById(attendanceId);
     if (!attendance) {
       return res.status(404).json({ message: "Attendance session not found" });
+    }
+
+    if (!isSameSubnet(clientIp, attendance.subnet)) {
+      return res.status(403).json({ message: "Invalid WiFi network. Attendance marking not allowed." });
     }
 
     // ❌ Reject if student is on a different WiFi network
@@ -177,7 +200,7 @@ app.get("/attendance/:id", async (req, res) => {
 });
 app.get("/api/attendance/:attendanceId/verify", async (req, res) => {
   const { attendanceId } = req.params;
-  const clientIp = req.ip;
+  const clientIp = requestIp.getClientIp(req);
   const deviceId = crypto
     .createHash("sha256")
     .update(req.headers["user-agent"] || "")
