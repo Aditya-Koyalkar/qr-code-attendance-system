@@ -4,6 +4,7 @@ import ProtectedRoute from "./layouts/ProtectedRoute";
 import Dashboard from "./pages/Dashboard";
 import ClassPage from "./pages/ClassPage";
 import AttendancePage from "./pages/AttendancePage";
+import MarkAttendance from "./pages/MarkAttendance";
 
 export default function App() {
   return (
@@ -26,7 +27,15 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-        <Route path={"/attendance/:id"} element={<AttendancePage />} />
+        <Route
+          path={"/attendance/:id"}
+          element={
+            <ProtectedRoute>
+              <AttendancePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/mark-attendance" element={<MarkAttendance />} />
         <Route path="/" element={<>Hello</>} />
       </Routes>
     </Router>

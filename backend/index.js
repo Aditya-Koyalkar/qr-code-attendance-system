@@ -108,7 +108,7 @@ app.post("/create-attendance", async (req, res) => {
 
     // Generate QR Code with attendance ID
     const frontend_url = process.env.FRONTEND_URL;
-    const qrCodeUrl = `${frontend_url}/${newAttendance._id}`;
+    const qrCodeUrl = `${frontend_url}/mark-attendance/${newAttendance._id}`;
     const qrCodeImage = await qr.toDataURL(qrCodeUrl);
     newAttendance.qrCode = qrCodeImage; // Store the QR in DB
     await newAttendance.save();
@@ -184,6 +184,48 @@ app.get("/attendance/:id", async (req, res) => {
   }
 
   res.json({ qrCode: attendance.qrCode });
+});
+app.get("/api/attendance/:attendanceId/verify", async (req, res) => {
+  const { attendanceId } = req.params;
+  const clientIp = getClientIp(req);
+  const deviceId = crypto
+    .createHash("sha256")
+    .update(req.headers["user-agent"] || "")
+    .digest("hex");
+
+  try {
+    const attendance = await Attendance.findById(attendanceId);
+    if (!attendance) return res.status(404).json({ success: false, message: "Attendance not found." });
+
+    // Check if device/IP is valid
+    if (attendance.ipAddress !== clientIp) {
+      return res.status(403).json({ success: false, message: "Must be on the same WiFi network!" });
+    }
+    const attendanceTaken = await AttendanceLog.findOne({
+      $where: {
+        deviceId,
+      },
+    });
+    if (attendanceTaken) {
+      return res.status(403).json({ success: false, message: "Attendance already marked" });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server error." });
+  }
+});
+
+app.get("/api/attendance/:attendanceId/students", async (req, res) => {
+  const { attendanceId } = req.params;
+  try {
+    const attendance = await Attendance.findById(attendanceId);
+    if (!attendance) return res.status(404).json({ error: "Attendance not found" });
+
+    const students = await Student.find({ classId: attendance.classId });
+    res.json(students);
+  } catch (error) {
+    res.status(500).json({ error: "Server error" });
+  }
 });
 
 app.listen(5000, () => console.log("Server running on port 5000"));
