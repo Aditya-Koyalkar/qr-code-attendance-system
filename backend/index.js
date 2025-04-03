@@ -88,17 +88,10 @@ app.post("/api/students", async (req, res) => {
   res.json(newStudent);
 });
 
-const getLocalSubnet = () => {
-  const nets = networkInterfaces();
-  for (const name of Object.keys(nets)) {
-    for (const net of nets[name]) {
-      if (net.family === "IPv4" && !net.internal) {
-        const subnet = net.address.split(".").slice(0, 3).join(".") + ".0"; // Example: 192.168.1.0
-        return subnet;
-      }
-    }
-  }
-  return null;
+const getSubnetFromIp = (ip) => {
+  if (!ip) return null;
+  // Extract the first three octets of the IP address to represent the subnet
+  return ip.split(".").slice(0, 3).join(".") + ".0";
 };
 
 app.post("/create-attendance", async (req, res) => {
@@ -106,7 +99,7 @@ app.post("/create-attendance", async (req, res) => {
 
   try {
     const ip = requestIp.getClientIp(req);
-    const subnet = getLocalSubnet(); // Capture the local subnet
+    const subnet = getSubnetFromIp(ip); // Use the faculty's IP to determine subnet
     const newAttendance = new Attendance({ classId, date });
     const frontend_url = process.env.FRONTEND_URL;
     const qrCodeUrl = `${frontend_url}/mark-attendance/${newAttendance._id}`;
@@ -122,8 +115,10 @@ app.post("/create-attendance", async (req, res) => {
   }
 });
 
-const isSameSubnet = (studentIp, storedSubnet) => {
-  return studentIp.startsWith(storedSubnet.split(".").slice(0, 3).join("."));
+const isSameSubnet = (clientIp, storedSubnet) => {
+  if (!clientIp || !storedSubnet) return false;
+  const clientSubnet = getSubnetFromIp(clientIp);
+  return clientSubnet === storedSubnet;
 };
 app.post("/api/mark-attendance/:attendanceId", async (req, res) => {
   const { attendanceId } = req.params;
