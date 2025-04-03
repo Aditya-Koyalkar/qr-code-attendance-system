@@ -185,5 +185,8 @@ app.get("/attendance/:id", async (req, res) => {
 
   res.json({ qrCode: attendance.qrCode });
 });
+app.get("*", (res) => {
+  res.sendFile(path.join(__dirname, "../../frontend/dist/index.html"));
+});
 
 app.listen(5000, () => console.log("Server running on port 5000"));
