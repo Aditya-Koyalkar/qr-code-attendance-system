@@ -4,7 +4,7 @@ const qr = require("qrcode");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const { ClerkExpressWithAuth } = require("@clerk/clerk-sdk-node");
-const { getClientIp } = require("request-ip");
+const requestIp = require("request-ip");
 const crypto = require("crypto");
 const os = require("os");
 const { networkInterfaces } = os;
@@ -117,6 +117,7 @@ app.post("/create-attendance", async (req, res) => {
     await newAttendance.save();
     res.json({ attendanceId: newAttendance._id, qrCode: qrCodeImage });
   } catch (error) {
+    console.log(error);
     res.status(500).json({ message: "Error creating attendance", error });
   }
 });
