@@ -172,7 +172,7 @@ app.get("/attendance/:id", async (req, res) => {
 app.get("/api/attendance/:attendanceId/verify", async (req, res) => {
   console.log("hello");
   const { attendanceId } = req.params;
-  const clientIp = getClientIp(req);
+  const clientIp = req.ip;
   console.log(clientIp);
   const deviceId = crypto
     .createHash("sha256")
