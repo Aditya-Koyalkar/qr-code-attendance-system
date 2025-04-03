@@ -105,7 +105,7 @@ app.post("/create-attendance", async (req, res) => {
   }
 });
 
-app.post("/mark-attendance/:attendanceId", async (req, res) => {
+app.post("/api/mark-attendance/:attendanceId", async (req, res) => {
   const { attendanceId } = req.params;
   const { studentId } = req.body;
   const deviceId = crypto
