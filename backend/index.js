@@ -91,26 +91,13 @@ app.post("/create-attendance", async (req, res) => {
   const { classId, date } = req.body;
 
   try {
-    // Get Server IP (WiFi network of the faculty)
-    const nets = networkInterfaces();
-    let ipAddress = "";
-
-    Object.values(nets).forEach((net) => {
-      net.forEach((n) => {
-        if (n.family === "IPv4" && !n.internal) {
-          ipAddress = n.address;
-        }
-      });
-    });
-
-    // Create new attendance session
-    const newAttendance = new Attendance({ classId, date, ipAddress });
-
-    // Generate QR Code with attendance ID
+    const ip = req.ip;
+    const newAttendance = new Attendance({ classId, date });
     const frontend_url = process.env.FRONTEND_URL;
     const qrCodeUrl = `${frontend_url}/mark-attendance/${newAttendance._id}`;
     const qrCodeImage = await qr.toDataURL(qrCodeUrl);
     newAttendance.qrCode = qrCodeImage; // Store the QR in DB
+    newAttendance.ipAddress = ip;
     await newAttendance.save();
     res.json({ attendanceId: newAttendance._id, qrCode: qrCodeImage });
   } catch (error) {
@@ -118,15 +105,12 @@ app.post("/create-attendance", async (req, res) => {
   }
 });
 
-const requestIp = require("request-ip");
-
 app.post("/mark-attendance/:attendanceId", async (req, res) => {
   const { attendanceId } = req.params;
   const { studentId, deviceId } = req.body;
 
   // Get client's IP address
-  const clientIp = requestIp.getClientIp(req);
-
+  const clientIp = req.ip;
   try {
     // Get the attendance session
     const attendance = await Attendance.findById(attendanceId);
@@ -186,13 +170,15 @@ app.get("/attendance/:id", async (req, res) => {
   res.json({ qrCode: attendance.qrCode });
 });
 app.get("/api/attendance/:attendanceId/verify", async (req, res) => {
+  console.log("hello");
   const { attendanceId } = req.params;
   const clientIp = getClientIp(req);
+  console.log(clientIp);
   const deviceId = crypto
     .createHash("sha256")
     .update(req.headers["user-agent"] || "")
     .digest("hex");
-
+  console.log(deviceId);
   try {
     const attendance = await Attendance.findById(attendanceId);
     if (!attendance) return res.status(404).json({ success: false, message: "Attendance not found." });

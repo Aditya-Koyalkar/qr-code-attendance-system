@@ -4,7 +4,7 @@ import axios from "axios";
 import { BACKEND_URL } from "../lib/env";
 
 const MarkAttendance = () => {
-  const { attendanceId } = useParams(); // Get attendance ID from URL
+  const { id: attendanceId } = useParams(); // Get attendance ID from URL
   const navigate = useNavigate();
   const [students, setStudents] = useState([]);
   const [selectedStudentId, setSelectedStudentId] = useState("");
