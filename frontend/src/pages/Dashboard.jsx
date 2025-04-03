@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useUser } from "@clerk/clerk-react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { BACKEND_URL } from "../lib/env";
 export default function Dashboard() {
   const { user, isSignedIn } = useUser();
   const [loading, setLoading] = useState(true);
@@ -19,14 +20,14 @@ export default function Dashboard() {
   const createUserIfNotExists = async () => {
     try {
       // Create or verify faculty in backend
-      await axios.post("http://localhost:5000/api/faculty", {
+      await axios.post(`${BACKEND_URL}/api/faculty`, {
         clerkId: user.id,
         name: user.fullName,
         email: user.primaryEmailAddress?.emailAddress,
       });
 
       // Fetch faculty ID
-      const facultyResponse = await axios.get(`http://localhost:5000/api/faculty/${user.id}`);
+      const facultyResponse = await axios.get(`${BACKEND_URL}/api/faculty/${user.id}`);
       const fetchedFacultyId = facultyResponse.data._id;
 
       // Set facultyId state and fetch classes immediately
@@ -40,7 +41,7 @@ export default function Dashboard() {
   };
   const fetchClasses = async (id) => {
     try {
-      const response = await axios.get(`http://localhost:5000/api/classes/${id}`);
+      const response = await axios.get(`${BACKEND_URL}/api/classes/${id}`);
       setClasses(response.data);
     } catch (error) {
       console.error("Error fetching classes:", error);
@@ -51,7 +52,7 @@ export default function Dashboard() {
     if (!newClassName.trim()) return;
 
     try {
-      const response = await axios.post("http://localhost:5000/api/create-class", {
+      const response = await axios.post(`${BACKEND_URL}/api/create-class`, {
         name: newClassName,
         facultyId: facultyId,
       });

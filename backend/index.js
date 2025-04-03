@@ -12,7 +12,14 @@ const dotenv = require("dotenv");
 require("dotenv").config(); // Load env variables
 const app = express();
 app.use(express.json());
-app.use(cors());
+
+const allowedOrigins = ["http://localhost:5413"];
+
+app.use(
+  cors({
+    origin: allowedOrigins,
+  })
+);
 app.use(cookieParser());
 
 mongoose.connect(process.env.MONGODB_URI || "", { useNewUrlParser: true, useUnifiedTopology: true });

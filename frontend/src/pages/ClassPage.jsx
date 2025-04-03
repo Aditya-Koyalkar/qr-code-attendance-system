@@ -1,6 +1,7 @@
 import axios from "axios";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { BACKEND_URL } from "../lib/env";
 
 const ClassPage = () => {
   const { id: classId } = useParams();
@@ -17,7 +18,7 @@ const ClassPage = () => {
 
   const fetchStudents = async () => {
     try {
-      const response = await axios.get(`http://localhost:5000/api/students/${classId}`);
+      const response = await axios.get(`${BACKEND_URL}/api/students/${classId}`);
       setStudents(response.data);
     } catch (error) {
       console.error("Error fetching students:", error);
@@ -25,7 +26,7 @@ const ClassPage = () => {
   };
   const fetchAttendances = async () => {
     try {
-      const response = await axios.get(`http://localhost:5000/api/attendances/${classId}`);
+      const response = await axios.get(`${BACKEND_URL}/api/attendances/${classId}`);
       setAttendances(response.data);
     } catch (error) {
       console.error("Error fetching attendances:", error);
@@ -36,7 +37,7 @@ const ClassPage = () => {
     if (!newStudentName.trim() || !newStudentRollNo.trim()) return;
 
     try {
-      const response = await axios.post("http://localhost:5000/api/students", {
+      const response = await axios.post(`${BACKEND_URL}/api/students`, {
         name: newStudentName,
         rollNo: newStudentRollNo,
         classId,
@@ -53,7 +54,7 @@ const ClassPage = () => {
     if (!attendanceDateTime.trim()) return;
 
     try {
-      await axios.post("http://localhost:5000/create-attendance", {
+      await axios.post(`${BACKEND_URL}/create-attendance`, {
         classId,
         date: attendanceDateTime,
       });

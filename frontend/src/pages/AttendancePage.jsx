@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
+import { BACKEND_URL } from "../lib/env";
 
 const AttendancePage = () => {
   const { id } = useParams();
@@ -8,7 +9,7 @@ const AttendancePage = () => {
 
   useEffect(() => {
     axios
-      .get(`http://localhost:5000/attendance/${id}`)
+      .get(`${BACKEND_URL}/attendance/${id}`)
       .then((response) => {
         setQrCode(response.data.qrCode);
       })
