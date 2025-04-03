@@ -10,7 +10,7 @@ const os = require("os");
 const { networkInterfaces } = os;
 const dotenv = require("dotenv");
 require("dotenv").config(); // Load env variables
-
+const app = express();
 app.use(express.json());
 app.use(cors());
 app.use(cookieParser());
