@@ -13,7 +13,7 @@ require("dotenv").config(); // Load env variables
 const app = express();
 app.use(express.json());
 
-const allowedOrigins = ["http://localhost:5413"];
+const allowedOrigins = ["http://localhost:5173"];
 
 app.use(
   cors({
