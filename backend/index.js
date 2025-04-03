@@ -15,7 +15,7 @@ app.use(express.json());
 app.use(cors());
 app.use(cookieParser());
 
-mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
+mongoose.connect(process.env.MONGODB_URI || "", { useNewUrlParser: true, useUnifiedTopology: true });
 
 const FacultySchema = new mongoose.Schema({ name: String, email: String, clerkId: String });
 const ClassSchema = new mongoose.Schema({ name: String, facultyId: mongoose.Schema.Types.ObjectId });
