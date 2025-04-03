@@ -211,6 +211,9 @@ app.get("/api/attendance/:attendanceId/verify", async (req, res) => {
     if (attendance.ipAddress !== clientIp) {
       return res.status(403).json({ success: false, message: "Must be on the same WiFi network!" });
     }
+    if (!isSameSubnet(clientIp, attendance.subnet)) {
+      return res.status(403).json({ message: "Invalid WiFi network. Attendance marking not allowed." });
+    }
     const attendanceTaken = await AttendanceLog.findOne({ attendanceId, deviceId });
     if (attendanceTaken) {
       return res.status(403).json({ success: false, message: "Attendance already marked" });
