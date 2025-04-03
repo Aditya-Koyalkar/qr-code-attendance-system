@@ -107,8 +107,11 @@ app.post("/create-attendance", async (req, res) => {
 
 app.post("/mark-attendance/:attendanceId", async (req, res) => {
   const { attendanceId } = req.params;
-  const { studentId, deviceId } = req.body;
-
+  const { studentId } = req.body;
+  const deviceId = crypto
+    .createHash("sha256")
+    .update(req.headers["user-agent"] || "")
+    .digest("hex");
   // Get client's IP address
   const clientIp = req.ip;
   try {
@@ -124,11 +127,14 @@ app.post("/mark-attendance/:attendanceId", async (req, res) => {
     }
 
     // ❌ Check if this student has already marked attendance from this device
-    const existingLog = await AttendanceLog.findOne({ attendanceId, studentId, deviceId });
-    if (existingLog) {
+    const existingLogDevice = await AttendanceLog.findOne({ attendanceId, deviceId });
+    if (existingLogDevice) {
       return res.status(409).json({ message: "Attendance already marked from this device." });
     }
-
+    const existingLog = await AttendanceLog.findOne({ attendanceId, deviceId, studentId });
+    if (existingLog) {
+      return res.status(409).json({ message: "Attendance already marked by student." });
+    }
     // ✅ Mark attendance
     const newLog = new AttendanceLog({ attendanceId, studentId, deviceId, ipAddress: clientIp });
     await newLog.save();
