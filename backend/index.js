@@ -100,7 +100,8 @@ app.post("/create-attendance", async (req, res) => {
     const newAttendance = new Attendance({ classId, date, ipAddress });
 
     // Generate QR Code with attendance ID
-    const qrCodeUrl = `http://localhost:3000/mark-attendance/${newAttendance._id}`;
+    const frontend_url = process.env.FRONTED_URL;
+    const qrCodeUrl = `${frontend_url}/${newAttendance._id}`;
     const qrCodeImage = await qr.toDataURL(qrCodeUrl);
     newAttendance.qrCode = qrCodeImage; // Store the QR in DB
     await newAttendance.save();
