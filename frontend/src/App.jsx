@@ -27,6 +27,7 @@ export default function App() {
           }
         />
         <Route path={"/attendance/:id"} element={<AttendancePage />} />
+        <Route path="/" element={<>Hello</>} />
       </Routes>
     </Router>
   );
