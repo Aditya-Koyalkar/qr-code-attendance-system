@@ -1,13 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useUser } from "@clerk/clerk-react";
 import axios from "axios";
 import { BACKEND_URL } from "../lib/env";
 
 export default function MarkAttendancePage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { isSignedIn, user } = useUser();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -17,11 +15,9 @@ export default function MarkAttendancePage() {
   const [showStudentList, setShowStudentList] = useState(false);
 
   useEffect(() => {
-    if (isSignedIn) {
-      verifyAttendance();
-      fetchStudents();
-    }
-  }, [isSignedIn, id]);
+    verifyAttendance();
+    fetchStudents();
+  }, [id]);
 
   const verifyAttendance = async () => {
     try {
@@ -62,11 +58,6 @@ export default function MarkAttendancePage() {
       setLoading(false);
     }
   };
-
-  if (!isSignedIn) {
-    navigate("/signin");
-    return null;
-  }
 
   if (loading && !attendanceData) {
     return (
