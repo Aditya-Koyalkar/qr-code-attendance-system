@@ -573,4 +573,34 @@ app.delete("/api/students/:studentId", async (req, res) => {
   }
 });
 
+// Add delete attendance endpoint
+app.delete("/api/attendance/:attendanceId", async (req, res) => {
+  try {
+    const { attendanceId } = req.params;
+
+    // Find the attendance session first
+    const attendance = await Attendance.findById(attendanceId);
+    if (!attendance) {
+      return res.status(404).json({ error: "Attendance session not found" });
+    }
+
+    // Delete all attendance logs for this session
+    await AttendanceLog.deleteMany({ attendanceId });
+
+    // Delete the attendance session
+    await Attendance.findByIdAndDelete(attendanceId);
+
+    res.json({
+      message: "Attendance session and all associated records deleted successfully",
+      deletedAttendance: {
+        date: attendance.date,
+        classId: attendance.classId,
+      },
+    });
+  } catch (error) {
+    console.error("Error deleting attendance:", error);
+    res.status(500).json({ error: "Failed to delete attendance session" });
+  }
+});
+
 app.listen(5000, () => console.log("Server running on port 5000"));
