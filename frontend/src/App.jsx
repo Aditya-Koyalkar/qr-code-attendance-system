@@ -8,6 +8,7 @@ import AttendancePage from "./pages/AttendancePage";
 import MarkAttendance from "./pages/MarkAttendance";
 import LandingPage from "./pages/LandingPage";
 import "./App.css";
+import MarkAttendancePage from "./pages/MarkAttendancePage";
 
 export default function App() {
   const { isSignedIn, isLoaded } = useAuth();
@@ -52,7 +53,7 @@ export default function App() {
           path="/mark-attendance/:id"
           element={
             <ProtectedRoute>
-              <MarkAttendance />
+              <MarkAttendancePage />
             </ProtectedRoute>
           }
         />
