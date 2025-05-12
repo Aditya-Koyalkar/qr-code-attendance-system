@@ -53,7 +53,9 @@ export default function MarkAttendancePage() {
       setShowStudentList(false);
     } catch (error) {
       console.error("Error marking attendance:", error);
-      setError(error.response?.data?.message || "Failed to mark attendance");
+      const errorMessage = error.response?.data?.message || "Failed to mark attendance";
+      const errorDetails = error.response?.data?.details || "";
+      setError(errorDetails ? `${errorMessage}. ${errorDetails}` : errorMessage);
     } finally {
       setLoading(false);
     }
@@ -126,7 +128,14 @@ export default function MarkAttendancePage() {
             <p className="text-gray-600">Select your name from the list to mark attendance</p>
           </div>
 
-          {error && <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">{error}</div>}
+          {error && (
+            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-red-600 font-medium">{error}</p>
+              {error.includes("device") && (
+                <p className="text-red-500 text-sm mt-2">Please use the same device and browser you used during verification.</p>
+              )}
+            </div>
+          )}
 
           {!showStudentList ? (
             <button

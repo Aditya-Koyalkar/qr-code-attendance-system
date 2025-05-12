@@ -295,14 +295,19 @@ const isSameSubnet = (clientIp, storedSubnet) => {
   return clientSubnet === storedSubnet;
 };
 
-// Add endpoint to verify student and store device info
+// Update the device ID generation function to be more consistent
+const generateDeviceId = (userAgent) => {
+  return crypto
+    .createHash("sha256")
+    .update(userAgent || "")
+    .digest("hex");
+};
+
+// Update verify student endpoint
 app.post("/api/verify-student/:token", async (req, res) => {
   try {
     const { token } = req.params;
-    const deviceId = crypto
-      .createHash("sha256")
-      .update(req.headers["user-agent"] || "")
-      .digest("hex");
+    const deviceId = generateDeviceId(req.headers["user-agent"]);
     const clientIp = requestIp.getClientIp(req);
     const subnet = getSubnetFromIp(clientIp);
 
@@ -330,14 +335,11 @@ app.post("/api/verify-student/:token", async (req, res) => {
   }
 });
 
-// Update mark attendance endpoint to check device
+// Update mark attendance endpoint
 app.post("/api/mark-attendance/:attendanceId", async (req, res) => {
   const { attendanceId } = req.params;
   const { studentId } = req.body;
-  const deviceId = crypto
-    .createHash("sha256")
-    .update(req.headers["user-agent"] || "")
-    .digest("hex");
+  const deviceId = generateDeviceId(req.headers["user-agent"]);
   const clientIp = requestIp.getClientIp(req);
 
   try {
@@ -351,15 +353,28 @@ app.post("/api/mark-attendance/:attendanceId", async (req, res) => {
       return res.status(403).json({ message: "Student account not verified" });
     }
 
-    // Check if student is using their verified device
-    if (student.verifiedDeviceId !== deviceId) {
-      return res.status(403).json({ message: "Attendance can only be marked from your verified device" });
-    }
-
     // Get the attendance session
     const attendance = await Attendance.findById(attendanceId);
     if (!attendance) {
       return res.status(404).json({ message: "Attendance session not found" });
+    }
+
+    // Check if student is in the class
+    if (!student.classes.includes(attendance.classId)) {
+      return res.status(403).json({ message: "Student is not enrolled in this class" });
+    }
+
+    // Check if student is using their verified device
+    if (student.verifiedDeviceId !== deviceId) {
+      console.log("Device ID mismatch:", {
+        verified: student.verifiedDeviceId,
+        current: deviceId,
+        userAgent: req.headers["user-agent"],
+      });
+      return res.status(403).json({
+        message: "Attendance can only be marked from your verified device",
+        details: "Please use the same device you used for verification",
+      });
     }
 
     // Check if student is on the same network as when they verified
