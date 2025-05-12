@@ -31,7 +31,7 @@ const StudentSchema = new mongoose.Schema({
   name: String,
   rollNo: String,
   classId: mongoose.Schema.Types.ObjectId,
-  email: { type: String, required: true, unique: true },
+  email: { type: String, required: true },
   parentEmail: { type: String, required: true },
   isVerified: { type: Boolean, default: false },
   verificationToken: String,
@@ -39,6 +39,9 @@ const StudentSchema = new mongoose.Schema({
   verifiedIpAddress: String,
   verifiedSubnet: String,
 });
+
+// Create compound index for email and classId
+StudentSchema.index({ email: 1, classId: 1 }, { unique: true });
 
 const AttendanceSchema = new mongoose.Schema({
   classId: { type: mongoose.Schema.Types.ObjectId, ref: "Class", required: true },
