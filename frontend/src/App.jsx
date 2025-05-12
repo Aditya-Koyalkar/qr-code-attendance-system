@@ -50,14 +50,7 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-        <Route
-          path="/mark-attendance/:id"
-          element={
-            <ProtectedRoute>
-              <MarkAttendancePage />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/mark-attendance/:id" element={<MarkAttendancePage />} />
         <Route path="/verify-student/:token" element={<VerifyStudentPage />} />
 
         {/* Catch all route */}
