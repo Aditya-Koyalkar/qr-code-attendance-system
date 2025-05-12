@@ -360,7 +360,7 @@ app.post("/api/mark-attendance/:attendanceId", async (req, res) => {
     }
 
     // Check if student is in the class
-    if (!student.classes.includes(attendance.classId)) {
+    if (student.classId.toString() !== attendance.classId.toString()) {
       return res.status(403).json({ message: "Student is not enrolled in this class" });
     }
 
