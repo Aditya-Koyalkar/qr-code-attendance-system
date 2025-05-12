@@ -120,15 +120,33 @@ export default function ClassPage() {
     }
 
     try {
+      setError(""); // Clear any existing errors
       const response = await axios.delete(`${BACKEND_URL}/api/students/${studentId}`);
       setSuccess(
         `Student ${response.data.deletedStudent.name} (${response.data.deletedStudent.rollNo}) has been removed successfully. All attendance records have been deleted.`
       );
-      // Refresh the students list
-      fetchClassDetails();
+
+      // Revalidate all data
+      await Promise.all([
+        fetchClassDetails(), // Refresh students list
+        fetchAttendances(), // Refresh attendance records
+      ]);
+
+      // Clear success message after 3 seconds
+      setTimeout(() => {
+        setSuccess("");
+      }, 3000);
     } catch (error) {
       console.error("Error deleting student:", error);
-      setError(error.response?.data?.error || "Failed to remove student and their records");
+      if (error.response?.status === 404) {
+        setError("Student not found. They may have already been deleted.");
+      } else {
+        setError(error.response?.data?.error || "Failed to remove student and their records. Please try again.");
+      }
+      // Clear error message after 5 seconds
+      setTimeout(() => {
+        setError("");
+      }, 5000);
     }
   };
 
