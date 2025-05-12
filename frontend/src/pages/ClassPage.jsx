@@ -18,11 +18,17 @@ export default function ClassPage() {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [studentAttendanceHistory, setStudentAttendanceHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
-  const [newStudent, setNewStudent] = useState({ name: "", rollNo: "", parentEmail: "" });
+  const [newStudent, setNewStudent] = useState({
+    name: "",
+    rollNo: "",
+    parentEmail: "",
+    email: "",
+  });
   const [searchQuery, setSearchQuery] = useState("");
   const [attendanceDateTime, setAttendanceDateTime] = useState("");
   const [attendances, setAttendances] = useState([]);
   const [qrCode, setQrCode] = useState(null);
+  const [success, setSuccess] = useState("");
 
   useEffect(() => {
     if (isSignedIn) {
@@ -84,44 +90,45 @@ export default function ClassPage() {
 
   const handleAddStudent = async (e) => {
     e.preventDefault();
-    if (!newStudent.name.trim() || !newStudent.rollNo.trim() || !newStudent.parentEmail.trim()) {
-      setError("Please fill in all fields");
-      return;
-    }
-
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(newStudent.parentEmail)) {
-      setError("Please enter a valid parent email address");
+    if (!newStudent.name || !newStudent.rollNo || !newStudent.parentEmail || !newStudent.email) {
+      setError("All fields are required");
       return;
     }
 
     try {
       const response = await axios.post(`${BACKEND_URL}/api/students`, {
-        name: newStudent.name,
-        rollNo: newStudent.rollNo,
+        ...newStudent,
         classId: id,
-        parentEmail: newStudent.parentEmail,
       });
       setStudents([...students, response.data]);
-      setNewStudent({ name: "", rollNo: "", parentEmail: "" });
       setShowAddStudentModal(false);
+      setNewStudent({ name: "", rollNo: "", parentEmail: "", email: "" });
       setError("");
     } catch (error) {
       console.error("Error adding student:", error);
-      setError(error.response?.data?.error || "Failed to add student. Please try again.");
+      setError(error.response?.data?.error || "Failed to add student");
     }
   };
 
   const handleDeleteStudent = async (studentId) => {
-    if (!window.confirm("Are you sure you want to remove this student?")) return;
+    if (
+      !window.confirm(
+        "Are you sure you want to remove this student? This will also delete all their attendance records. This action cannot be undone."
+      )
+    ) {
+      return;
+    }
 
     try {
-      await axios.delete(`${BACKEND_URL}/api/students/${studentId}`);
-      setStudents(students.filter((student) => student._id !== studentId));
+      const response = await axios.delete(`${BACKEND_URL}/api/students/${studentId}`);
+      setSuccess(
+        `Student ${response.data.deletedStudent.name} (${response.data.deletedStudent.rollNo}) has been removed successfully. All attendance records have been deleted.`
+      );
+      // Refresh the students list
+      fetchClassDetails();
     } catch (error) {
       console.error("Error deleting student:", error);
-      setError("Failed to remove student. Please try again.");
+      setError(error.response?.data?.error || "Failed to remove student and their records");
     }
   };
 
@@ -198,6 +205,7 @@ export default function ClassPage() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {error && <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">{error}</div>}
+        {success && <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg text-green-600">{success}</div>}
 
         {/* Attendance Records */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
@@ -262,6 +270,7 @@ export default function ClassPage() {
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Roll No</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Attendance Rate</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
@@ -271,6 +280,29 @@ export default function ClassPage() {
                   <tr key={student._id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{student.rollNo}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{student.name}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span
+                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          student.isVerified ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"
+                        }`}
+                      >
+                        {student.isVerified ? (
+                          <span className="flex items-center">
+                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                            Verified
+                          </span>
+                        ) : (
+                          <span className="flex items-center">
+                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Pending
+                          </span>
+                        )}
+                      </span>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       <div className="flex items-center">
                         <div className="w-24 bg-gray-200 rounded-full h-2.5 mr-2">
@@ -286,7 +318,15 @@ export default function ClassPage() {
                         </svg>
                         View History
                       </button>
-                      <button onClick={() => handleDeleteStudent(student._id)} className="text-red-600 hover:text-red-900">
+                      <button onClick={() => handleDeleteStudent(student._id)} className="text-red-600 hover:text-red-900 flex items-center">
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                          />
+                        </svg>
                         Remove
                       </button>
                     </td>
@@ -294,7 +334,7 @@ export default function ClassPage() {
                 ))}
                 {filteredStudents.length === 0 && (
                   <tr>
-                    <td colSpan="4" className="px-6 py-4 text-center text-sm text-gray-500">
+                    <td colSpan="5" className="px-6 py-4 text-center text-sm text-gray-500">
                       {searchQuery ? "No students found matching your search." : "No students added yet."}
                     </td>
                   </tr>
@@ -313,7 +353,7 @@ export default function ClassPage() {
                 <button
                   onClick={() => {
                     setShowAddStudentModal(false);
-                    setNewStudent({ name: "", rollNo: "", parentEmail: "" });
+                    setNewStudent({ name: "", rollNo: "", parentEmail: "", email: "" });
                     setError("");
                   }}
                   className="text-gray-400 hover:text-gray-500"
@@ -326,7 +366,20 @@ export default function ClassPage() {
               <form onSubmit={handleAddStudent}>
                 <div className="space-y-4">
                   <div>
-                    <label htmlFor="rollNo" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+                      Name
+                    </label>
+                    <input
+                      type="text"
+                      id="name"
+                      value={newStudent.name}
+                      onChange={(e) => setNewStudent({ ...newStudent, name: e.target.value })}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="rollNo" className="block text-sm font-medium text-gray-700">
                       Roll Number
                     </label>
                     <input
@@ -334,52 +387,51 @@ export default function ClassPage() {
                       id="rollNo"
                       value={newStudent.rollNo}
                       onChange={(e) => setNewStudent({ ...newStudent, rollNo: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Enter roll number"
-                      autoFocus
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      required
                     />
                   </div>
                   <div>
-                    <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-                      Student Name
+                    <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                      Student Email
                     </label>
                     <input
-                      type="text"
-                      id="name"
-                      value={newStudent.name}
-                      onChange={(e) => setNewStudent({ ...newStudent, name: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Enter student name"
+                      type="email"
+                      id="email"
+                      value={newStudent.email}
+                      onChange={(e) => setNewStudent({ ...newStudent, email: e.target.value })}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      required
                     />
                   </div>
                   <div>
-                    <label htmlFor="parentEmail" className="block text-sm font-medium text-gray-700 mb-2">
-                      Parent/Guardian Email
+                    <label htmlFor="parentEmail" className="block text-sm font-medium text-gray-700">
+                      Parent Email
                     </label>
                     <input
                       type="email"
                       id="parentEmail"
                       value={newStudent.parentEmail}
                       onChange={(e) => setNewStudent({ ...newStudent, parentEmail: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Enter parent/guardian email"
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      required
                     />
-                    <p className="mt-1 text-sm text-gray-500">Attendance notifications will be sent to this email address</p>
                   </div>
                 </div>
-                <div className="flex justify-end space-x-3 mt-6">
+                {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+                <div className="mt-6 flex justify-end space-x-3">
                   <button
                     type="button"
                     onClick={() => {
                       setShowAddStudentModal(false);
-                      setNewStudent({ name: "", rollNo: "", parentEmail: "" });
+                      setNewStudent({ name: "", rollNo: "", parentEmail: "", email: "" });
                       setError("");
                     }}
-                    className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition duration-300"
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
                   >
                     Cancel
                   </button>
-                  <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-300">
+                  <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md">
                     Add Student
                   </button>
                 </div>

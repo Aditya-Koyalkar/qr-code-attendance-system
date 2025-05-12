@@ -31,7 +31,13 @@ const StudentSchema = new mongoose.Schema({
   name: String,
   rollNo: String,
   classId: mongoose.Schema.Types.ObjectId,
+  email: { type: String, required: true, unique: true },
   parentEmail: { type: String, required: true },
+  isVerified: { type: Boolean, default: false },
+  verificationToken: String,
+  verifiedDeviceId: String,
+  verifiedIpAddress: String,
+  verifiedSubnet: String,
 });
 
 const AttendanceSchema = new mongoose.Schema({
@@ -57,17 +63,44 @@ const AttendanceLog = mongoose.model("AttendanceLog", AttendanceLogSchema);
 
 // Create email transporter
 const transporter = nodemailer.createTransport({
-  service: "gmail",
+  host: "smtp.gmail.com",
+  port: 587,
+  secure: false, // true for 465, false for other ports
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_APP_PASSWORD,
   },
+  debug: true, // Enable debug logging
 });
+
+// Verify email configuration
+const verifyEmailConfig = async () => {
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_APP_PASSWORD) {
+    console.error("Email configuration missing. Please check your .env file for EMAIL_USER and EMAIL_APP_PASSWORD");
+    return false;
+  }
+
+  try {
+    await transporter.verify();
+    console.log("Email configuration is valid");
+    return true;
+  } catch (error) {
+    console.error("Email configuration error:", error);
+    return false;
+  }
+};
+
+// Call verification on startup
+verifyEmailConfig();
 
 // Function to send attendance notification email
 const sendAttendanceEmail = async (student, attendance, isPresent) => {
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_APP_PASSWORD) {
+    throw new Error("Email configuration missing");
+  }
+
   const mailOptions = {
-    from: process.env.EMAIL_USER,
+    from: `"Attendance System" <${process.env.EMAIL_USER}>`,
     to: student.parentEmail,
     subject: `Attendance Update for ${student.name} - ${new Date(attendance.date).toLocaleDateString()}`,
     html: `
@@ -87,10 +120,12 @@ const sendAttendanceEmail = async (student, attendance, isPresent) => {
   };
 
   try {
-    await transporter.sendMail(mailOptions);
-    console.log(`Attendance email sent to ${student.parentEmail}`);
+    const info = await transporter.sendMail(mailOptions);
+    console.log("Email sent successfully:", info.response);
+    return true;
   } catch (error) {
     console.error("Error sending email:", error);
+    throw error;
   }
 };
 
@@ -126,14 +161,66 @@ app.get("/api/students/:classId", async (req, res) => {
   res.json(students);
 });
 
-// Update student creation endpoint to include parent email
+// Update student creation endpoint to include email verification
 app.post("/api/students", async (req, res) => {
-  const { name, rollNo, classId, parentEmail } = req.body;
-  if (!parentEmail) {
-    return res.status(400).json({ error: "Parent email is required" });
+  const { name, rollNo, classId, email, parentEmail } = req.body;
+
+  if (!email || !parentEmail) {
+    return res.status(400).json({ error: "Email and parent email are required" });
   }
-  const newStudent = await Student.create({ name, rollNo, classId, parentEmail });
-  res.json(newStudent);
+
+  try {
+    // Check if student with this email already exists
+    const existingStudent = await Student.findOne({ email });
+    if (existingStudent) {
+      return res.status(400).json({ error: "Student with this email already exists" });
+    }
+
+    // Generate verification token
+    const verificationToken = crypto.randomBytes(32).toString("hex");
+
+    const newStudent = await Student.create({
+      name,
+      rollNo,
+      classId,
+      email,
+      parentEmail,
+      verificationToken,
+      isVerified: false,
+    });
+
+    // Send verification email
+    const verificationLink = `${process.env.FRONTEND_URL}/verify-student/${verificationToken}`;
+    const mailOptions = {
+      from: `"Attendance System" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: "Verify Your Student Account",
+      html: `
+        <h2>Welcome to the Attendance System</h2>
+        <p>Dear ${name},</p>
+        <p>Please click the link below to verify your account and join your class:</p>
+        <a href="${verificationLink}" style="display: inline-block; padding: 10px 20px; background-color: #3B82F6; color: white; text-decoration: none; border-radius: 5px;">Verify Account</a>
+        <p>This link will only work once and will be used to verify your device for attendance marking.</p>
+        <p>If you did not request this, please ignore this email.</p>
+      `,
+    };
+
+    try {
+      const info = await transporter.sendMail(mailOptions);
+      console.log("Verification email sent successfully:", info.response);
+      res.json({ message: "Student created. Verification email sent." });
+    } catch (emailError) {
+      console.error("Error sending verification email:", emailError);
+      // Still create the student but inform about email failure
+      res.json({
+        message: "Student created but verification email could not be sent. Please try again later.",
+        error: emailError.message,
+      });
+    }
+  } catch (error) {
+    console.error("Error creating student:", error);
+    res.status(500).json({ error: "Failed to create student" });
+  }
 });
 
 const getSubnetFromIp = (ip) => {
@@ -204,6 +291,43 @@ const isSameSubnet = (clientIp, storedSubnet) => {
   const clientSubnet = getSubnetFromIp(clientIp);
   return clientSubnet === storedSubnet;
 };
+
+// Add endpoint to verify student and store device info
+app.post("/api/verify-student/:token", async (req, res) => {
+  try {
+    const { token } = req.params;
+    const deviceId = crypto
+      .createHash("sha256")
+      .update(req.headers["user-agent"] || "")
+      .digest("hex");
+    const clientIp = requestIp.getClientIp(req);
+    const subnet = getSubnetFromIp(clientIp);
+
+    const student = await Student.findOne({ verificationToken: token });
+    if (!student) {
+      return res.status(404).json({ error: "Invalid verification token" });
+    }
+
+    if (student.isVerified) {
+      return res.status(400).json({ error: "Student already verified" });
+    }
+
+    // Update student with device info and mark as verified
+    student.isVerified = true;
+    student.verifiedDeviceId = deviceId;
+    student.verifiedIpAddress = clientIp;
+    student.verifiedSubnet = subnet;
+    student.verificationToken = undefined; // Remove the token after use
+    await student.save();
+
+    res.json({ message: "Student verified successfully" });
+  } catch (error) {
+    console.error("Error verifying student:", error);
+    res.status(500).json({ error: "Failed to verify student" });
+  }
+});
+
+// Update mark attendance endpoint to check device
 app.post("/api/mark-attendance/:attendanceId", async (req, res) => {
   const { attendanceId } = req.params;
   const { studentId } = req.body;
@@ -211,39 +335,53 @@ app.post("/api/mark-attendance/:attendanceId", async (req, res) => {
     .createHash("sha256")
     .update(req.headers["user-agent"] || "")
     .digest("hex");
-  // Get client's IP address
   const clientIp = requestIp.getClientIp(req);
+
   try {
+    // Get the student
+    const student = await Student.findById(studentId);
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    if (!student.isVerified) {
+      return res.status(403).json({ message: "Student account not verified" });
+    }
+
+    // Check if student is using their verified device
+    if (student.verifiedDeviceId !== deviceId) {
+      return res.status(403).json({ message: "Attendance can only be marked from your verified device" });
+    }
+
     // Get the attendance session
     const attendance = await Attendance.findById(attendanceId);
     if (!attendance) {
       return res.status(404).json({ message: "Attendance session not found" });
     }
 
-    if (!isSameSubnet(clientIp, attendance.subnet)) {
-      return res.status(403).json({ message: "Invalid WiFi network. Attendance marking not allowed." });
+    // Check if student is on the same network as when they verified
+    if (!isSameSubnet(clientIp, student.verifiedSubnet)) {
+      return res.status(403).json({ message: "Must be on the same network as when you verified your account" });
     }
 
-    // ❌ Reject if student is on a different WiFi network
-    if (attendance.ipAddress !== clientIp) {
-      return res.status(403).json({ message: "Invalid WiFi network. Attendance marking not allowed." });
-    }
-
-    // ❌ Check if this student has already marked attendance from this device
-    const existingLogDevice = await AttendanceLog.findOne({ attendanceId, deviceId });
-    if (existingLogDevice) {
-      return res.status(409).json({ message: "Attendance already marked from this device." });
-    }
-    const existingLog = await AttendanceLog.findOne({ attendanceId, deviceId, studentId });
+    // Check if attendance already marked
+    const existingLog = await AttendanceLog.findOne({ attendanceId, studentId });
     if (existingLog) {
-      return res.status(409).json({ message: "Attendance already marked by student." });
+      return res.status(409).json({ message: "Attendance already marked" });
     }
-    // ✅ Mark attendance
-    const newLog = new AttendanceLog({ attendanceId, studentId, deviceId, ipAddress: clientIp });
+
+    // Mark attendance
+    const newLog = new AttendanceLog({
+      attendanceId,
+      studentId,
+      deviceId,
+      ipAddress: clientIp,
+    });
     await newLog.save();
 
-    res.json({ message: "Attendance marked successfully." });
+    res.json({ message: "Attendance marked successfully" });
   } catch (error) {
+    console.error("Error marking attendance:", error);
     res.status(500).json({ message: "Error marking attendance", error });
   }
 });
@@ -394,6 +532,44 @@ app.get("/api/students/:studentId/attendance-history", async (req, res) => {
   } catch (error) {
     console.error("Error fetching student attendance history:", error);
     res.status(500).json({ error: "Failed to fetch attendance history" });
+  }
+});
+
+// Add delete student endpoint
+app.delete("/api/students/:studentId", async (req, res) => {
+  try {
+    const { studentId } = req.params;
+
+    // Find the student first to get their class ID
+    const student = await Student.findById(studentId);
+    if (!student) {
+      return res.status(404).json({ error: "Student not found" });
+    }
+
+    // Get all attendance sessions for this class
+    const attendanceSessions = await Attendance.find({ classId: student.classId });
+    const attendanceIds = attendanceSessions.map((session) => session._id);
+
+    // Delete all attendance logs for this student across all sessions
+    await AttendanceLog.deleteMany({
+      studentId: studentId,
+      attendanceId: { $in: attendanceIds },
+    });
+
+    // Delete the student
+    await Student.findByIdAndDelete(studentId);
+
+    res.json({
+      message: "Student and all associated attendance records deleted successfully",
+      deletedStudent: {
+        name: student.name,
+        rollNo: student.rollNo,
+        email: student.email,
+      },
+    });
+  } catch (error) {
+    console.error("Error deleting student:", error);
+    res.status(500).json({ error: "Failed to delete student and associated records" });
   }
 });
 

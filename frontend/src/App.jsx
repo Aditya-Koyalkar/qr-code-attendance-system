@@ -9,6 +9,7 @@ import MarkAttendance from "./pages/MarkAttendance";
 import LandingPage from "./pages/LandingPage";
 import "./App.css";
 import MarkAttendancePage from "./pages/MarkAttendancePage";
+import VerifyStudentPage from "./pages/VerifyStudentPage";
 
 export default function App() {
   const { isSignedIn, isLoaded } = useAuth();
@@ -57,6 +58,7 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+        <Route path="/verify-student/:token" element={<VerifyStudentPage />} />
 
         {/* Catch all route */}
         <Route path="*" element={<Navigate to="/" replace />} />

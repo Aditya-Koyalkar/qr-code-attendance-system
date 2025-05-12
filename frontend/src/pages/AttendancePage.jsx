@@ -12,6 +12,7 @@ export default function AttendancePage() {
   const [attendance, setAttendance] = useState(null);
   const [students, setStudents] = useState([]);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [attendanceStats, setAttendanceStats] = useState({
     total: 0,
     present: 0,
@@ -76,6 +77,28 @@ export default function AttendancePage() {
     }
   };
 
+  const handleDeleteStudent = async (studentId) => {
+    if (
+      !window.confirm(
+        "Are you sure you want to remove this student? This will also delete all their attendance records. This action cannot be undone."
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const response = await axios.delete(`${BACKEND_URL}/api/students/${studentId}`);
+      setSuccess(
+        `Student ${response.data.deletedStudent.name} (${response.data.deletedStudent.rollNo}) has been removed successfully. All attendance records have been deleted.`
+      );
+      // Refresh the attendance details
+      fetchAttendanceDetails();
+    } catch (error) {
+      console.error("Error deleting student:", error);
+      setError(error.response?.data?.error || "Failed to remove student and their records");
+    }
+  };
+
   if (!isSignedIn) {
     navigate("/signin");
     return null;
@@ -111,6 +134,7 @@ export default function AttendancePage() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {error && <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">{error}</div>}
+        {success && <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg text-green-600">{success}</div>}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* QR Code Section */}
@@ -245,7 +269,7 @@ export default function AttendancePage() {
         {/* Attendance Records */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Attendance Records</h2>
+            <h2 className="text-lg font-semibold text-gray-900"></h2>
             <button
               onClick={handleSendNotifications}
               disabled={sendingNotifications}
@@ -291,30 +315,6 @@ export default function AttendancePage() {
               {notificationStatus.message}
             </div>
           )}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {students.map((student) => (
-              <div
-                key={student._id}
-                onClick={() => navigate(`/attendance/${student._id}`)}
-                className="bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition duration-300 cursor-pointer"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-500">Date</p>
-                    <p className="font-medium text-gray-900">{new Date(student.markedAt).toLocaleString()}</p>
-                  </div>
-                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                  </svg>
-                </div>
-              </div>
-            ))}
-            {students.length === 0 && (
-              <div className="col-span-full text-center py-8">
-                <p className="text-gray-500">No attendance records yet. Create one to get started.</p>
-              </div>
-            )}
-          </div>
         </div>
       </main>
     </div>
