@@ -9,10 +9,10 @@ const LandingPage = () => {
         <div className="flex justify-between items-center">
           <div className="text-2xl font-bold text-blue-600">SmartAttendance</div>
           <div className="space-x-4">
-            <Link to="/login" className="text-gray-600 hover:text-blue-600">
-              Login
+            <Link to="/signin" className="text-gray-600 hover:text-blue-600">
+              Sign In
             </Link>
-            <Link to="/register" className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+            <Link to="/signin" className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
               Get Started
             </Link>
           </div>
@@ -26,7 +26,7 @@ const LandingPage = () => {
           Streamline your classroom attendance tracking with our intelligent system. Secure, efficient, and designed for modern education.
         </p>
         <div className="flex justify-center space-x-4">
-          <Link to="/register" className="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition duration-300">
+          <Link to="/signin" className="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition duration-300">
             Get Started Free
           </Link>
           <Link
@@ -134,7 +134,7 @@ const LandingPage = () => {
             Join hundreds of faculty members who are already using our system to streamline their attendance tracking.
           </p>
           <Link
-            to="/register"
+            to="/signin"
             className="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-blue-50 transition duration-300 inline-block"
           >
             Get Started Now
