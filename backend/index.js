@@ -270,13 +270,39 @@ app.get("/api/attendances/:classId", async (req, res) => {
 
 app.get("/attendance/:id", async (req, res) => {
   const { id } = req.params;
-  const attendance = await Attendance.findById(id);
+  try {
+    const attendance = await Attendance.findById(id);
+    if (!attendance) {
+      return res.status(404).json({ message: "Attendance not found" });
+    }
 
-  if (!attendance) {
-    return res.status(404).json({ message: "Attendance not found" });
+    // Get all students in the class
+    const students = await Student.find({ classId: attendance.classId });
+
+    // Get all attendance logs for this session
+    const attendanceLogs = await AttendanceLog.find({ attendanceId: id });
+
+    // Create a set of student IDs who have marked attendance
+    const presentStudentIds = new Set(attendanceLogs.map((log) => log.studentId.toString()));
+
+    // Add attendance status to each student
+    const studentsWithAttendance = students.map((student) => ({
+      ...student.toObject(),
+      hasMarkedAttendance: presentStudentIds.has(student._id.toString()),
+    }));
+
+    res.json({
+      qrCode: attendance.qrCode,
+      date: attendance.date,
+      students: studentsWithAttendance,
+      totalStudents: students.length,
+      presentCount: attendanceLogs.length,
+      absentCount: students.length - attendanceLogs.length,
+    });
+  } catch (error) {
+    console.error("Error fetching attendance details:", error);
+    res.status(500).json({ message: "Error fetching attendance details" });
   }
-
-  res.json({ qrCode: attendance.qrCode });
 });
 app.get("/api/attendance/:attendanceId/verify", async (req, res) => {
   const { attendanceId } = req.params;
@@ -311,10 +337,24 @@ app.get("/api/attendance/:attendanceId/students", async (req, res) => {
     const attendance = await Attendance.findById(attendanceId);
     if (!attendance) return res.status(404).json({ error: "Attendance not found" });
 
+    // Get all students in the class
     const students = await Student.find({ classId: attendance.classId });
-    res.json(students);
+
+    // Get all attendance logs for this session
+    const attendanceLogs = await AttendanceLog.find({ attendanceId });
+
+    // Create a set of student IDs who have marked attendance
+    const presentStudentIds = new Set(attendanceLogs.map((log) => log.studentId.toString()));
+
+    // Add attendance status to each student
+    const studentsWithAttendance = students.map((student) => ({
+      ...student.toObject(),
+      hasMarkedAttendance: presentStudentIds.has(student._id.toString()),
+    }));
+
+    res.json(studentsWithAttendance);
   } catch (error) {
-    console.log(error);
+    console.error("Error fetching students with attendance:", error);
     res.status(500).json({ error: "Server error" });
   }
 });

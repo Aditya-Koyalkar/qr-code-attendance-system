@@ -29,24 +29,19 @@ export default function AttendancePage() {
 
   const fetchAttendanceDetails = async () => {
     try {
-      const [attendanceResponse, studentsResponse] = await Promise.all([
-        axios.get(`${BACKEND_URL}/attendance/${id}`),
-        axios.get(`${BACKEND_URL}/api/attendance/${id}/students`),
-      ]);
+      const response = await axios.get(`${BACKEND_URL}/attendance/${id}`);
+      const { qrCode, date, students, totalStudents, presentCount, absentCount } = response.data;
 
-      setAttendance(attendanceResponse.data);
-      setStudents(studentsResponse.data);
+      setAttendance({ qrCode, date });
+      setStudents(students);
 
       // Calculate attendance stats
-      const totalStudents = studentsResponse.data.length;
-      const presentStudents = studentsResponse.data.filter((student) => student.marked).length;
-      const absentStudents = totalStudents - presentStudents;
-      const percentage = totalStudents > 0 ? (presentStudents / totalStudents) * 100 : 0;
+      const percentage = totalStudents > 0 ? (presentCount / totalStudents) * 100 : 0;
 
       setAttendanceStats({
         total: totalStudents,
-        present: presentStudents,
-        absent: absentStudents,
+        present: presentCount,
+        absent: absentCount,
         percentage: percentage.toFixed(1),
       });
     } catch (error) {
@@ -224,15 +219,13 @@ export default function AttendancePage() {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span
                             className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                              student.marked ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                              student.hasMarkedAttendance ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
                             }`}
                           >
-                            {student.marked ? "Present" : "Absent"}
+                            {student.hasMarkedAttendance ? "Present" : "Absent"}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {student.markedAt ? new Date(student.markedAt).toLocaleTimeString() : "-"}
-                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{student.hasMarkedAttendance ? "Marked" : "-"}</td>
                       </tr>
                     ))}
                     {students.length === 0 && (
