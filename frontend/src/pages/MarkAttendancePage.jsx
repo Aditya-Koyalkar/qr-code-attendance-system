@@ -40,7 +40,8 @@ export default function MarkAttendancePage() {
   const fetchStudents = async () => {
     try {
       const response = await axios.get(`${BACKEND_URL}/api/attendance/${id}/students`);
-      setStudents(response.data);
+      const verifiedStudents = response.data.filter((student) => student.isVerified);
+      setStudents(verifiedStudents);
     } catch (error) {
       console.error("Error fetching students:", error);
     }
@@ -169,41 +170,44 @@ export default function MarkAttendancePage() {
               </div>
 
               <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-lg">
-                {students.map((student) => (
-                  <button
-                    key={student._id}
-                    onClick={() => {
-                      if (!student.hasMarkedAttendance) {
-                        setSelectedStudent(student);
-                        handleMarkAttendance(student._id);
-                      }
-                    }}
-                    disabled={loading || student.hasMarkedAttendance}
-                    className={`w-full px-4 py-3 text-left transition duration-300 ${loading ? "opacity-50 cursor-not-allowed" : ""} ${
-                      student.hasMarkedAttendance ? "bg-green-50 cursor-default" : "hover:bg-gray-50"
-                    } ${selectedStudent?._id === student._id ? "bg-blue-50" : ""}`}
-                  >
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="font-medium text-gray-900">{student.name}</p>
-                        <p className="text-sm text-gray-500">Roll No: {student.rollNo}</p>
+                {students.length > 0 ? (
+                  students.map((student) => (
+                    <button
+                      key={student._id}
+                      onClick={() => {
+                        if (!student.hasMarkedAttendance) {
+                          setSelectedStudent(student);
+                          handleMarkAttendance(student._id);
+                        }
+                      }}
+                      disabled={loading || student.hasMarkedAttendance}
+                      className={`w-full px-4 py-3 text-left transition duration-300 ${loading ? "opacity-50 cursor-not-allowed" : ""} ${
+                        student.hasMarkedAttendance ? "bg-green-50 cursor-default" : "hover:bg-gray-50"
+                      } ${selectedStudent?._id === student._id ? "bg-blue-50" : ""}`}
+                    >
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className="font-medium text-gray-900">{student.name}</p>
+                          <p className="text-sm text-gray-500">Roll No: {student.rollNo}</p>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          {student.hasMarkedAttendance ? (
+                            <span className="text-green-600 text-sm font-medium flex items-center">
+                              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                              </svg>
+                              Marked
+                            </span>
+                          ) : selectedStudent?._id === student._id && loading ? (
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                          ) : null}
+                        </div>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        {student.hasMarkedAttendance ? (
-                          <span className="text-green-600 text-sm font-medium flex items-center">
-                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                            </svg>
-                            Marked
-                          </span>
-                        ) : selectedStudent?._id === student._id && loading ? (
-                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
-                        ) : null}
-                      </div>
-                    </div>
-                  </button>
-                ))}
-                {students.length === 0 && <div className="px-4 py-3 text-center text-gray-500">No students found</div>}
+                    </button>
+                  ))
+                ) : (
+                  <div className="px-4 py-3 text-center text-gray-500">No verified students found. Please verify your account first.</div>
+                )}
               </div>
             </div>
           )}
