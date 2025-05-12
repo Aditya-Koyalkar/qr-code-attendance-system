@@ -96,17 +96,29 @@ export default function ClassPage() {
     }
 
     try {
+      setLoading(true); // Set loading state
       const response = await axios.post(`${BACKEND_URL}/api/students`, {
         ...newStudent,
         classId: id,
       });
-      setStudents([...students, response.data]);
+
+      // Refresh the data
+      await Promise.all([fetchClassDetails(), fetchAttendances()]);
+
       setShowAddStudentModal(false);
       setNewStudent({ name: "", rollNo: "", parentEmail: "", email: "" });
       setError("");
+      setSuccess("Student added successfully. A verification email has been sent to the student.");
+
+      // Clear success message after 3 seconds
+      setTimeout(() => {
+        setSuccess("");
+      }, 3000);
     } catch (error) {
       console.error("Error adding student:", error);
       setError(error.response?.data?.error || "Failed to add student");
+    } finally {
+      setLoading(false); // Clear loading state
     }
   };
 
@@ -176,8 +188,11 @@ export default function ClassPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
       </div>
     );
   }
