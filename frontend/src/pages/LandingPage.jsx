@@ -1,7 +1,17 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import { useAuth, useUser } from "@clerk/clerk-react";
 
 const LandingPage = () => {
+  const { isSignedIn, isLoaded } = useAuth();
+  const { user } = useUser();
+
+  // If user is signed in, redirect to dashboard
+
+  if (!isLoaded) {
+    return <div>Loading...</div>;
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-blue-50">
       {/* Navigation */}
@@ -9,12 +19,23 @@ const LandingPage = () => {
         <div className="flex justify-between items-center">
           <div className="text-2xl font-bold text-blue-600">SmartAttendance</div>
           <div className="space-x-4">
-            <Link to="/signin" className="text-gray-600 hover:text-blue-600">
-              Sign In
-            </Link>
-            <Link to="/signin" className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
-              Get Started
-            </Link>
+            {!isSignedIn ? (
+              <>
+                <Link to="/signin" className="text-gray-600 hover:text-blue-600">
+                  Sign In
+                </Link>
+                <Link to="/signin" className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+                  Get Started
+                </Link>
+              </>
+            ) : (
+              <div className="flex items-center space-x-4">
+                <span className="text-gray-600">Welcome, {user?.firstName || "User"}</span>
+                <Link to="/dashboard" className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+                  Go to Dashboard
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       </nav>

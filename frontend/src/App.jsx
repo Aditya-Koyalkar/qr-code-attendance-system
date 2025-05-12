@@ -1,4 +1,5 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { useAuth } from "@clerk/clerk-react";
 import SignInPage from "./pages/SignIn";
 import ProtectedRoute from "./layouts/ProtectedRoute";
 import Dashboard from "./pages/Dashboard";
@@ -6,12 +7,23 @@ import ClassPage from "./pages/ClassPage";
 import AttendancePage from "./pages/AttendancePage";
 import MarkAttendance from "./pages/MarkAttendance";
 import LandingPage from "./pages/LandingPage";
+import "./App.css";
 
 export default function App() {
+  const { isSignedIn, isLoaded } = useAuth();
+
+  if (!isLoaded) {
+    return <div>Loading...</div>;
+  }
+
   return (
     <Router>
       <Routes>
-        <Route path="/signin" element={<SignInPage />} />
+        {/* Public routes */}
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/signin" element={isSignedIn ? <Navigate to="/dashboard" replace /> : <SignInPage />} />
+
+        {/* Protected routes */}
         <Route
           path="/dashboard"
           element={
@@ -29,15 +41,24 @@ export default function App() {
           }
         />
         <Route
-          path={"/attendance/:id"}
+          path="/attendance/:id"
           element={
             <ProtectedRoute>
               <AttendancePage />
             </ProtectedRoute>
           }
         />
-        <Route path="/mark-attendance/:id" element={<MarkAttendance />} />
-        <Route path="/" element={<LandingPage />} />
+        <Route
+          path="/mark-attendance/:id"
+          element={
+            <ProtectedRoute>
+              <MarkAttendance />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Catch all route */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
   );
