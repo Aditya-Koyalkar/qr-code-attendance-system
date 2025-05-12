@@ -5,6 +5,7 @@ import Dashboard from "./pages/Dashboard";
 import ClassPage from "./pages/ClassPage";
 import AttendancePage from "./pages/AttendancePage";
 import MarkAttendance from "./pages/MarkAttendance";
+import LandingPage from "./pages/LandingPage";
 
 export default function App() {
   return (
@@ -36,7 +37,7 @@ export default function App() {
           }
         />
         <Route path="/mark-attendance/:id" element={<MarkAttendance />} />
-        <Route path="/" element={<>Hello</>} />
+        <Route path="/" element={<LandingPage />} />
       </Routes>
     </Router>
   );
