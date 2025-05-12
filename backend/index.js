@@ -9,6 +9,7 @@ const crypto = require("crypto");
 const os = require("os");
 const { networkInterfaces } = os;
 const dotenv = require("dotenv");
+const nodemailer = require("nodemailer");
 require("dotenv").config(); // Load env variables
 const app = express();
 app.use(express.json());
@@ -26,7 +27,12 @@ mongoose.connect(process.env.MONGODB_URI || "", { useNewUrlParser: true, useUnif
 
 const FacultySchema = new mongoose.Schema({ name: String, email: String, clerkId: String });
 const ClassSchema = new mongoose.Schema({ name: String, facultyId: mongoose.Schema.Types.ObjectId });
-const StudentSchema = new mongoose.Schema({ name: String, rollNo: String, classId: mongoose.Schema.Types.ObjectId });
+const StudentSchema = new mongoose.Schema({
+  name: String,
+  rollNo: String,
+  classId: mongoose.Schema.Types.ObjectId,
+  parentEmail: { type: String, required: true },
+});
 
 const AttendanceSchema = new mongoose.Schema({
   classId: { type: mongoose.Schema.Types.ObjectId, ref: "Class", required: true },
@@ -48,6 +54,45 @@ const Class = mongoose.model("Class", ClassSchema);
 const Student = mongoose.model("Student", StudentSchema);
 const Attendance = mongoose.model("Attendance", AttendanceSchema);
 const AttendanceLog = mongoose.model("AttendanceLog", AttendanceLogSchema);
+
+// Create email transporter
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_APP_PASSWORD,
+  },
+});
+
+// Function to send attendance notification email
+const sendAttendanceEmail = async (student, attendance, isPresent) => {
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: student.parentEmail,
+    subject: `Attendance Update for ${student.name} - ${new Date(attendance.date).toLocaleDateString()}`,
+    html: `
+      <h2>Attendance Update</h2>
+      <p>Dear Parent/Guardian,</p>
+      <p>This is to inform you about the attendance status of your ward:</p>
+      <ul>
+        <li><strong>Student Name:</strong> ${student.name}</li>
+        <li><strong>Roll Number:</strong> ${student.rollNo}</li>
+        <li><strong>Date:</strong> ${new Date(attendance.date).toLocaleDateString()}</li>
+        <li><strong>Time:</strong> ${new Date(attendance.date).toLocaleTimeString()}</li>
+        <li><strong>Status:</strong> ${isPresent ? "Present" : "Absent"}</li>
+      </ul>
+      <p>Thank you for your attention.</p>
+      <p>Best regards,<br>Attendance Management System</p>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`Attendance email sent to ${student.parentEmail}`);
+  } catch (error) {
+    console.error("Error sending email:", error);
+  }
+};
 
 app.post("/api/faculty", async (req, res) => {
   const { clerkId, name, email } = req.body;
@@ -81,10 +126,13 @@ app.get("/api/students/:classId", async (req, res) => {
   res.json(students);
 });
 
-// Add a student to a class
+// Update student creation endpoint to include parent email
 app.post("/api/students", async (req, res) => {
-  const { name, rollNo, classId } = req.body;
-  const newStudent = await Student.create({ name, rollNo, classId });
+  const { name, rollNo, classId, parentEmail } = req.body;
+  if (!parentEmail) {
+    return res.status(400).json({ error: "Parent email is required" });
+  }
+  const newStudent = await Student.create({ name, rollNo, classId, parentEmail });
   res.json(newStudent);
 });
 
@@ -94,24 +142,60 @@ const getSubnetFromIp = (ip) => {
   return ip.split(".").slice(0, 3).join(".") + ".0";
 };
 
+// Function to process attendance and send emails
+const processAttendanceAndSendEmails = async (attendanceId) => {
+  try {
+    const attendance = await Attendance.findById(attendanceId);
+    if (!attendance) return;
+
+    const students = await Student.find({ classId: attendance.classId });
+    const attendanceLogs = await AttendanceLog.find({ attendanceId });
+
+    // Create a set of present student IDs for quick lookup
+    const presentStudentIds = new Set(attendanceLogs.map((log) => log.studentId.toString()));
+
+    // Send emails to all parents
+    for (const student of students) {
+      const isPresent = presentStudentIds.has(student._id.toString());
+      await sendAttendanceEmail(student, attendance, isPresent);
+    }
+  } catch (error) {
+    console.error("Error processing attendance emails:", error);
+  }
+};
+
+// Update create-attendance endpoint to schedule email notifications
 app.post("/create-attendance", async (req, res) => {
   const { classId, date } = req.body;
 
   try {
     const ip = requestIp.getClientIp(req);
-    const subnet = getSubnetFromIp(ip); // Use the faculty's IP to determine subnet
+    const subnet = getSubnetFromIp(ip);
     const newAttendance = new Attendance({ classId, date });
     const frontend_url = process.env.FRONTEND_URL;
     const qrCodeUrl = `${frontend_url}/mark-attendance/${newAttendance._id}`;
     const qrCodeImage = await qr.toDataURL(qrCodeUrl);
-    newAttendance.qrCode = qrCodeImage; // Store the QR in DB
+    newAttendance.qrCode = qrCodeImage;
     newAttendance.ipAddress = ip;
     newAttendance.subnet = subnet;
     await newAttendance.save();
+
     res.json({ attendanceId: newAttendance._id, qrCode: qrCodeImage });
   } catch (error) {
     console.log(error);
     res.status(500).json({ message: "Error creating attendance", error });
+  }
+});
+
+// Add new endpoint to manually trigger notifications
+app.post("/api/attendance/:attendanceId/send-notifications", async (req, res) => {
+  const { attendanceId } = req.params;
+  try {
+    await processAttendanceAndSendEmails(attendanceId);
+    res.json({ message: "Attendance notifications sent successfully" });
+  } catch (error) {
+    console.error("Error sending notifications:", error);
+    res.status(500).json({ message: "Error sending notifications", error });
   }
 });
 

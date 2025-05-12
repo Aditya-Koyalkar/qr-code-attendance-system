@@ -14,7 +14,7 @@ export default function ClassPage() {
   const [error, setError] = useState("");
   const [showAddStudentModal, setShowAddStudentModal] = useState(false);
   const [showCreateAttendanceModal, setShowCreateAttendanceModal] = useState(false);
-  const [newStudent, setNewStudent] = useState({ name: "", rollNo: "" });
+  const [newStudent, setNewStudent] = useState({ name: "", rollNo: "", parentEmail: "" });
   const [searchQuery, setSearchQuery] = useState("");
   const [attendanceDateTime, setAttendanceDateTime] = useState("");
   const [attendances, setAttendances] = useState([]);
@@ -80,8 +80,15 @@ export default function ClassPage() {
 
   const handleAddStudent = async (e) => {
     e.preventDefault();
-    if (!newStudent.name.trim() || !newStudent.rollNo.trim()) {
+    if (!newStudent.name.trim() || !newStudent.rollNo.trim() || !newStudent.parentEmail.trim()) {
       setError("Please fill in all fields");
+      return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newStudent.parentEmail)) {
+      setError("Please enter a valid parent email address");
       return;
     }
 
@@ -90,14 +97,15 @@ export default function ClassPage() {
         name: newStudent.name,
         rollNo: newStudent.rollNo,
         classId: id,
+        parentEmail: newStudent.parentEmail,
       });
       setStudents([...students, response.data]);
-      setNewStudent({ name: "", rollNo: "" });
+      setNewStudent({ name: "", rollNo: "", parentEmail: "" });
       setShowAddStudentModal(false);
       setError("");
     } catch (error) {
       console.error("Error adding student:", error);
-      setError("Failed to add student. Please try again.");
+      setError(error.response?.data?.error || "Failed to add student. Please try again.");
     }
   };
 
@@ -283,7 +291,7 @@ export default function ClassPage() {
                 <button
                   onClick={() => {
                     setShowAddStudentModal(false);
-                    setNewStudent({ name: "", rollNo: "" });
+                    setNewStudent({ name: "", rollNo: "", parentEmail: "" });
                     setError("");
                   }}
                   className="text-gray-400 hover:text-gray-500"
@@ -322,13 +330,27 @@ export default function ClassPage() {
                       placeholder="Enter student name"
                     />
                   </div>
+                  <div>
+                    <label htmlFor="parentEmail" className="block text-sm font-medium text-gray-700 mb-2">
+                      Parent/Guardian Email
+                    </label>
+                    <input
+                      type="email"
+                      id="parentEmail"
+                      value={newStudent.parentEmail}
+                      onChange={(e) => setNewStudent({ ...newStudent, parentEmail: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Enter parent/guardian email"
+                    />
+                    <p className="mt-1 text-sm text-gray-500">Attendance notifications will be sent to this email address</p>
+                  </div>
                 </div>
                 <div className="flex justify-end space-x-3 mt-6">
                   <button
                     type="button"
                     onClick={() => {
                       setShowAddStudentModal(false);
-                      setNewStudent({ name: "", rollNo: "" });
+                      setNewStudent({ name: "", rollNo: "", parentEmail: "" });
                       setError("");
                     }}
                     className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition duration-300"

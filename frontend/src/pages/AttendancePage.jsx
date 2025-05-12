@@ -18,6 +18,8 @@ export default function AttendancePage() {
     absent: 0,
     percentage: 0,
   });
+  const [sendingNotifications, setSendingNotifications] = useState(false);
+  const [notificationStatus, setNotificationStatus] = useState(null);
 
   useEffect(() => {
     if (isSignedIn) {
@@ -52,6 +54,30 @@ export default function AttendancePage() {
       setError("Failed to load attendance details. Please try again.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSendNotifications = async () => {
+    if (!window.confirm("Are you sure you want to send attendance notifications to all parents?")) {
+      return;
+    }
+
+    setSendingNotifications(true);
+    setNotificationStatus(null);
+    try {
+      await axios.post(`${BACKEND_URL}/api/attendance/${id}/send-notifications`);
+      setNotificationStatus({
+        type: "success",
+        message: "Attendance notifications sent successfully to all parents",
+      });
+    } catch (error) {
+      console.error("Error sending notifications:", error);
+      setNotificationStatus({
+        type: "error",
+        message: error.response?.data?.message || "Failed to send notifications",
+      });
+    } finally {
+      setSendingNotifications(false);
     }
   };
 
@@ -220,6 +246,81 @@ export default function AttendancePage() {
                 </table>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Attendance Records */}
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Attendance Records</h2>
+            <button
+              onClick={handleSendNotifications}
+              disabled={sendingNotifications}
+              className={`px-4 py-2 rounded-lg flex items-center space-x-2 transition duration-300 ${
+                sendingNotifications ? "bg-gray-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-700 text-white"
+              }`}
+            >
+              {sendingNotifications ? (
+                <>
+                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                  <span>Sending...</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                    />
+                  </svg>
+                  <span>Send Notifications</span>
+                </>
+              )}
+            </button>
+          </div>
+          {notificationStatus && (
+            <div
+              className={`mb-4 p-4 rounded-lg ${
+                notificationStatus.type === "success"
+                  ? "bg-green-50 border border-green-200 text-green-600"
+                  : "bg-red-50 border border-red-200 text-red-600"
+              }`}
+            >
+              {notificationStatus.message}
+            </div>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {students.map((student) => (
+              <div
+                key={student._id}
+                onClick={() => navigate(`/attendance/${student._id}`)}
+                className="bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition duration-300 cursor-pointer"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-500">Date</p>
+                    <p className="font-medium text-gray-900">{new Date(student.markedAt).toLocaleString()}</p>
+                  </div>
+                  <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </div>
+            ))}
+            {students.length === 0 && (
+              <div className="col-span-full text-center py-8">
+                <p className="text-gray-500">No attendance records yet. Create one to get started.</p>
+              </div>
+            )}
           </div>
         </div>
       </main>
