@@ -359,4 +359,42 @@ app.get("/api/attendance/:attendanceId/students", async (req, res) => {
   }
 });
 
+// Get student attendance history
+app.get("/api/students/:studentId/attendance-history", async (req, res) => {
+  try {
+    const { studentId } = req.params;
+
+    // First, get the student to find their class
+    const student = await Student.findById(studentId);
+    if (!student) {
+      return res.status(404).json({ error: "Student not found" });
+    }
+
+    // Get all attendance sessions for this class
+    const attendanceSessions = await Attendance.find({ classId: student.classId }).sort({ date: -1 }); // Sort by date in descending order
+
+    // Get all attendance logs for this student
+    const attendanceLogs = await AttendanceLog.find({ studentId });
+
+    // Create a map of attendance logs for quick lookup
+    const attendanceLogMap = new Map(attendanceLogs.map((log) => [log.attendanceId.toString(), log]));
+
+    // Create history records for all attendance sessions
+    const history = attendanceSessions.map((session) => {
+      const log = attendanceLogMap.get(session._id.toString());
+      return {
+        _id: session._id,
+        date: session.date,
+        status: log ? "present" : "absent", // If there's no log, student is absent
+        markedAt: log ? log.timestamp : null,
+      };
+    });
+
+    res.json(history);
+  } catch (error) {
+    console.error("Error fetching student attendance history:", error);
+    res.status(500).json({ error: "Failed to fetch attendance history" });
+  }
+});
+
 app.listen(5000, () => console.log("Server running on port 5000"));

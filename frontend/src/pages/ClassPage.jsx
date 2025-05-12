@@ -14,6 +14,10 @@ export default function ClassPage() {
   const [error, setError] = useState("");
   const [showAddStudentModal, setShowAddStudentModal] = useState(false);
   const [showCreateAttendanceModal, setShowCreateAttendanceModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [studentAttendanceHistory, setStudentAttendanceHistory] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   const [newStudent, setNewStudent] = useState({ name: "", rollNo: "", parentEmail: "" });
   const [searchQuery, setSearchQuery] = useState("");
   const [attendanceDateTime, setAttendanceDateTime] = useState("");
@@ -118,6 +122,21 @@ export default function ClassPage() {
     } catch (error) {
       console.error("Error deleting student:", error);
       setError("Failed to remove student. Please try again.");
+    }
+  };
+
+  const handleViewHistory = async (student) => {
+    setSelectedStudent(student);
+    setShowHistoryModal(true);
+    setLoadingHistory(true);
+    try {
+      const response = await axios.get(`${BACKEND_URL}/api/students/${student._id}/attendance-history`);
+      setStudentAttendanceHistory(response.data);
+    } catch (error) {
+      console.error("Error fetching attendance history:", error);
+      setError("Failed to load attendance history. Please try again.");
+    } finally {
+      setLoadingHistory(false);
     }
   };
 
@@ -261,7 +280,10 @@ export default function ClassPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button onClick={() => navigate(`/class/${id}/attendance/${student._id}`)} className="text-blue-600 hover:text-blue-900 mr-4">
+                      <button onClick={() => handleViewHistory(student)} className="text-blue-600 hover:text-blue-900 mr-4 flex items-center">
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
                         View History
                       </button>
                       <button onClick={() => handleDeleteStudent(student._id)} className="text-red-600 hover:text-red-900">
@@ -431,6 +453,79 @@ export default function ClassPage() {
                   >
                     Close
                   </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Attendance History Modal */}
+        {showHistoryModal && selectedStudent && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6">
+              <div className="flex justify-between items-center mb-4">
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-900">Attendance History</h2>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {selectedStudent.name} - Roll No: {selectedStudent.rollNo}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowHistoryModal(false);
+                    setSelectedStudent(null);
+                    setStudentAttendanceHistory([]);
+                  }}
+                  className="text-gray-400 hover:text-gray-500"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {loadingHistory ? (
+                <div className="flex justify-center items-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {studentAttendanceHistory.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {studentAttendanceHistory.map((record) => (
+                            <tr key={record._id} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(record.date).toLocaleDateString()}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span
+                                  className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                    record.status === "present" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                                  }`}
+                                >
+                                  {record.status === "present" ? "Present" : "Absent"}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {record.markedAt ? new Date(record.markedAt).toLocaleTimeString() : "-"}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-gray-500">No attendance records found for this student.</p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
