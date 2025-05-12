@@ -39,13 +39,38 @@ export default function ClassPage() {
 
   const fetchClassDetails = async () => {
     try {
-      const [classResponse, studentsResponse] = await Promise.all([
+      const [classResponse, studentsResponse, attendancesResponse] = await Promise.all([
         axios.get(`${BACKEND_URL}/api/classes/${id}`),
         axios.get(`${BACKEND_URL}/api/students/${id}`),
+        axios.get(`${BACKEND_URL}/api/attendances/${id}`),
       ]);
 
+      // Get all attendance sessions for this class
+      const attendanceSessions = attendancesResponse.data;
+
+      // Get all attendance logs for these sessions
+      const attendanceLogs = await Promise.all(
+        attendanceSessions.map((session) => axios.get(`${BACKEND_URL}/api/attendance/${session._id}/students`))
+      );
+
+      // Calculate attendance rate for each student
+      const studentsWithAttendance = studentsResponse.data.map((student) => {
+        const totalSessions = attendanceSessions.length;
+        const presentSessions = attendanceLogs.reduce((count, logResponse) => {
+          const studentLog = logResponse.data.find((log) => log._id === student._id);
+          return count + (studentLog?.hasMarkedAttendance ? 1 : 0);
+        }, 0);
+
+        const attendanceRate = totalSessions > 0 ? (presentSessions / totalSessions) * 100 : 0;
+
+        return {
+          ...student,
+          attendanceRate: attendanceRate.toFixed(1),
+        };
+      });
+
       setClassDetails(classResponse.data);
-      setStudents(studentsResponse.data);
+      setStudents(studentsWithAttendance);
     } catch (error) {
       console.error("Error fetching class details:", error);
       setError("Failed to load class details. Please try again.");
@@ -339,9 +364,14 @@ export default function ClassPage() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       <div className="flex items-center">
                         <div className="w-24 bg-gray-200 rounded-full h-2.5 mr-2">
-                          <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${student.attendanceRate || 0}%` }}></div>
+                          <div
+                            className={`h-2.5 rounded-full ${
+                              student.attendanceRate >= 75 ? "bg-green-600" : student.attendanceRate >= 50 ? "bg-yellow-600" : "bg-red-600"
+                            }`}
+                            style={{ width: `${student.attendanceRate}%` }}
+                          ></div>
                         </div>
-                        <span>{student.attendanceRate || 0}%</span>
+                        <span>{student.attendanceRate}%</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
