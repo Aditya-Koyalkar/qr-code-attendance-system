@@ -10,6 +10,7 @@ const os = require("os");
 const { networkInterfaces } = os;
 const dotenv = require("dotenv");
 const nodemailer = require("nodemailer");
+const cloudinary = require("cloudinary").v2;
 require("dotenv").config(); // Load env variables
 const app = express();
 app.use(express.json());
@@ -57,6 +58,7 @@ const AttendanceLogSchema = new mongoose.Schema({
   deviceId: { type: String, required: true }, // Unique device identifier
   ipAddress: { type: String, required: true }, // IP of the student at time of marking
   timestamp: { type: Date, default: Date.now }, // When the attendance was marked
+  photoUrl: { type: String }, // URL of the captured photo
 });
 const Faculty = mongoose.model("Faculty", FacultySchema);
 const Class = mongoose.model("Class", ClassSchema);
@@ -338,7 +340,7 @@ app.post("/api/verify-student/:token", async (req, res) => {
 // Update mark attendance endpoint
 app.post("/api/mark-attendance/:attendanceId", async (req, res) => {
   const { attendanceId } = req.params;
-  const { studentId } = req.body;
+  const { studentId, photoData } = req.body;
   const deviceId = generateDeviceId(req.headers["user-agent"]);
   const clientIp = requestIp.getClientIp(req);
 
@@ -388,19 +390,35 @@ app.post("/api/mark-attendance/:attendanceId", async (req, res) => {
       return res.status(409).json({ message: "Attendance already marked" });
     }
 
+    // Upload photo to Cloudinary if provided
+    let photoUrl = null;
+    if (photoData) {
+      try {
+        const uploadResponse = await cloudinary.uploader.upload(`data:image/jpeg;base64,${photoData}`, {
+          folder: "attendance_photos",
+          resource_type: "auto",
+        });
+        photoUrl = uploadResponse.secure_url;
+      } catch (uploadError) {
+        console.error("Error uploading photo:", uploadError);
+        return res.status(500).json({ message: "Error uploading photo" });
+      }
+    }
+
     // Mark attendance
     const newLog = new AttendanceLog({
       attendanceId,
       studentId,
       deviceId,
       ipAddress: clientIp,
+      photoUrl,
     });
     await newLog.save();
 
-    res.json({ message: "Attendance marked successfully" });
+    res.json({ message: "Attendance marked successfully", photoUrl });
   } catch (error) {
     console.error("Error marking attendance:", error);
-    res.status(500).json({ message: "Error marking attendance", error });
+    res.status(500).json({ message: "Error marking attendance", error: error.message });
   }
 });
 
@@ -438,14 +456,19 @@ app.get("/attendance/:id", async (req, res) => {
     // Get all attendance logs for this session
     const attendanceLogs = await AttendanceLog.find({ attendanceId: id });
 
-    // Create a set of student IDs who have marked attendance
-    const presentStudentIds = new Set(attendanceLogs.map((log) => log.studentId.toString()));
+    // Create a map of attendance logs for quick lookup
+    const attendanceLogMap = new Map(attendanceLogs.map((log) => [log.studentId.toString(), log]));
 
-    // Add attendance status to each student
-    const studentsWithAttendance = students.map((student) => ({
-      ...student.toObject(),
-      hasMarkedAttendance: presentStudentIds.has(student._id.toString()),
-    }));
+    // Add attendance status and photo URL to each student
+    const studentsWithAttendance = students.map((student) => {
+      const log = attendanceLogMap.get(student._id.toString());
+      return {
+        ...student.toObject(),
+        hasMarkedAttendance: !!log,
+        photoUrl: log?.photoUrl || null,
+        markedAt: log?.timestamp || null,
+      };
+    });
 
     res.json({
       qrCode: attendance.qrCode,
@@ -619,6 +642,13 @@ app.delete("/api/attendance/:attendanceId", async (req, res) => {
     console.error("Error deleting attendance:", error);
     res.status(500).json({ error: "Failed to delete attendance session" });
   }
+});
+
+// Configure Cloudinary
+cloudinary.config({
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
 });
 
 app.listen(5000, () => console.log("Server running on port 5000"));

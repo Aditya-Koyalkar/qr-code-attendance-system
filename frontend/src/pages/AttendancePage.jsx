@@ -229,14 +229,51 @@ export default function AttendancePage() {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Photo</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Roll No</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {students.map((student) => (
                       <tr key={student._id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {student.photoUrl ? (
+                            <div className="relative w-12 h-12 rounded-full overflow-hidden">
+                              <img
+                                src={student.photoUrl}
+                                alt={`${student.name}'s attendance photo`}
+                                className="w-full h-full object-cover"
+                                onClick={() => {
+                                  // Show full-size image in a modal
+                                  const modal = document.createElement("div");
+                                  modal.className = "fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50";
+                                  modal.onclick = () => modal.remove();
+
+                                  const img = document.createElement("img");
+                                  img.src = student.photoUrl;
+                                  img.className = "max-w-3xl max-h-[90vh] object-contain";
+
+                                  modal.appendChild(img);
+                                  document.body.appendChild(modal);
+                                }}
+                              />
+                            </div>
+                          ) : (
+                            <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center">
+                              <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth="2"
+                                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                                />
+                              </svg>
+                            </div>
+                          )}
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{student.rollNo}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{student.name}</td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -274,11 +311,14 @@ export default function AttendancePage() {
                             </span>
                           )}
                         </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {student.markedAt ? new Date(student.markedAt).toLocaleTimeString() : "-"}
+                        </td>
                       </tr>
                     ))}
                     {students.length === 0 && (
                       <tr>
-                        <td colSpan="4" className="px-6 py-4 text-center text-sm text-gray-500">
+                        <td colSpan="5" className="px-6 py-4 text-center text-sm text-gray-500">
                           No students in this class.
                         </td>
                       </tr>
