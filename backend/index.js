@@ -229,9 +229,14 @@ app.post("/api/students", async (req, res) => {
 });
 
 const getSubnetFromIp = (ip) => {
-  if (!ip) return null;
+  if (!ip) {
+    console.log("getSubnetFromIp: No IP provided");
+    return null;
+  }
   // Extract the first three octets of the IP address to represent the subnet
-  return ip.split(".").slice(0, 3).join(".") + ".0";
+  const subnet = ip.split(".").slice(0, 3).join(".") + ".0";
+  console.log(`getSubnetFromIp: IP ${ip} converted to subnet ${subnet}`);
+  return subnet;
 };
 
 // Function to process attendance and send emails
@@ -292,9 +297,15 @@ app.post("/api/attendance/:attendanceId/send-notifications", async (req, res) =>
 });
 
 const isSameSubnet = (clientIp, storedSubnet) => {
-  if (!clientIp || !storedSubnet) return false;
+  console.log(`isSameSubnet: Comparing client IP ${clientIp} with stored subnet ${storedSubnet}`);
+  if (!clientIp || !storedSubnet) {
+    console.log("isSameSubnet: Missing IP or subnet", { clientIp, storedSubnet });
+    return false;
+  }
   const clientSubnet = getSubnetFromIp(clientIp);
-  return clientSubnet === storedSubnet;
+  const result = clientSubnet === storedSubnet;
+  console.log(`isSameSubnet: Client subnet ${clientSubnet} matches stored subnet ${storedSubnet}: ${result}`);
+  return result;
 };
 
 // Update the device ID generation function to be more consistent
@@ -343,6 +354,7 @@ app.post("/api/mark-attendance/:attendanceId", async (req, res) => {
   const { studentId, photoData } = req.body;
   const deviceId = generateDeviceId(req.headers["user-agent"]);
   const clientIp = requestIp.getClientIp(req);
+  console.log(`Marking attendance - Client IP: ${clientIp}`);
 
   try {
     // Get the student
@@ -360,6 +372,8 @@ app.post("/api/mark-attendance/:attendanceId", async (req, res) => {
     if (!attendance) {
       return res.status(404).json({ message: "Attendance session not found" });
     }
+
+    console.log(`Attendance session details - IP: ${attendance.ipAddress}, Subnet: ${attendance.subnet}`);
 
     // Check if student is in the class
     if (student.classId.toString() !== attendance.classId.toString()) {
@@ -381,6 +395,11 @@ app.post("/api/mark-attendance/:attendanceId", async (req, res) => {
 
     // Check if student is on the same network as when they verified
     if (!isSameSubnet(clientIp, student.verifiedSubnet)) {
+      console.log("Network verification failed:", {
+        clientIp,
+        verifiedSubnet: student.verifiedSubnet,
+        clientSubnet: getSubnetFromIp(clientIp),
+      });
       return res.status(403).json({ message: "Must be on the same network as when you verified your account" });
     }
 
@@ -497,6 +516,7 @@ app.get("/api/attendance/:attendanceId/verify", async (req, res) => {
       return res.status(403).json({ success: false, message: "Must be on the same WiFi network!" });
     }
     if (!isSameSubnet(clientIp, attendance.subnet)) {
+      console.log("Invalid WiFi network. Attendance marking not allowed.");
       return res.status(403).json({ message: "Invalid WiFi network. Attendance marking not allowed." });
     }
     const attendanceTaken = await AttendanceLog.findOne({ attendanceId, deviceId });
