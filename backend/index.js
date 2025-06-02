@@ -14,6 +14,7 @@ const cloudinary = require("cloudinary").v2;
 require("dotenv").config(); // Load env variables
 const app = express();
 app.use(express.json());
+app.use(requestIp.mw()); // This will add req.clientIp
 
 const allowedOrigins = ["http://localhost:5173", "https://qr-code-attendance-system-fe.onrender.com/"];
 
@@ -133,7 +134,20 @@ const sendAttendanceEmail = async (student, attendance, isPresent) => {
     throw error;
   }
 };
+function getClientIP(req) {
+  // Try multiple methods to get the real IP
+  const ip =
+    req.clientIp ||
+    req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
+    req.headers["x-real-ip"] ||
+    req.connection?.remoteAddress ||
+    req.socket?.remoteAddress ||
+    req.connection?.socket?.remoteAddress ||
+    req.ip;
 
+  // Clean up IPv6 mapped IPv4 addresses
+  return ip?.replace(/^::ffff:/, "") || "unknown";
+}
 app.post("/api/faculty", async (req, res) => {
   const { clerkId, name, email } = req.body;
 
@@ -266,7 +280,7 @@ app.post("/create-attendance", async (req, res) => {
   const { classId, date } = req.body;
 
   try {
-    const ip = requestIp.getClientIp(req);
+    const ip = getClientIP(req);
     const subnet = getSubnetFromIp(ip);
     const newAttendance = new Attendance({ classId, date });
     const frontend_url = process.env.FRONTEND_URL;
@@ -504,7 +518,7 @@ app.get("/attendance/:id", async (req, res) => {
 });
 app.get("/api/attendance/:attendanceId/verify", async (req, res) => {
   const { attendanceId } = req.params;
-  const clientIp = requestIp.getClientIp(req);
+  const clientIp = getClientIP(req);
   const deviceId = crypto
     .createHash("sha256")
     .update(req.headers["user-agent"] || "")
