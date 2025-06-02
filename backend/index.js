@@ -504,8 +504,7 @@ app.get("/attendance/:id", async (req, res) => {
 });
 app.get("/api/attendance/:attendanceId/verify", async (req, res) => {
   const { attendanceId } = req.params;
-  const ip = requestIp.getClientIp(req);
-  console.log(ip.toString());
+  const clientIp = requestIp.getClientIp(req);
   const deviceId = crypto
     .createHash("sha256")
     .update(req.headers["user-agent"] || "")
