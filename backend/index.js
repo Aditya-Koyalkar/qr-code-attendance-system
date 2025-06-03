@@ -519,17 +519,18 @@ app.get("/attendance/:id", async (req, res) => {
 app.get("/api/attendance/:attendanceId/verify", async (req, res) => {
   const { attendanceId } = req.params;
   const clientIp = getClientIP(req);
+  // const ip = req.headers["cf-connecting-ip"] || req.headers["x-real-ip"] || req.headers["x-forwarded-for"] || req.socket.remoteAddress;
+  // console.log(ip);
   const deviceId = crypto
     .createHash("sha256")
     .update(req.headers["user-agent"] || "")
     .digest("hex");
+  const clientSubnet = getSubnetFromIp(clientIp);
   try {
     const attendance = await Attendance.findById(attendanceId);
     if (!attendance) return res.status(404).json({ success: false, message: "Attendance not found." });
-    // if (attendance.ipAddress !== ip) {
-    //   return res.status(403).json({ success: false, message: "Must be on the same WiFi network!" });
-    // }
-    if (!isSameSubnet(clientIp, attendance.subnet)) {
+
+    if (!isSameSubnet(clientSubnet, attendance.subnet)) {
       console.log("Invalid WiFi network. Attendance marking not allowed.");
       return res.status(403).json({ message: "Invalid WiFi network. Attendance marking not allowed." });
     }
