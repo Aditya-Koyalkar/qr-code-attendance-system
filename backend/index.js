@@ -190,7 +190,7 @@ app.post("/api/students", async (req, res) => {
 
   try {
     // Check if student with this email already exists
-    const existingStudent = await Student.findOne({ email });
+    const existingStudent = await Student.findOne({ email, classId });
     if (existingStudent) {
       return res.status(400).json({ error: "Student with this email already exists" });
     }
