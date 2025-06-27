@@ -286,15 +286,26 @@ app.post("/api/students", async (req, res) => {
   }
 });
 
-const getSubnetFromIp = (ip) => {
+const getSubnetFromIp = (ip, maskBits = 24) => {
   if (!ip) {
     console.log("getSubnetFromIp: No IP provided");
     return null;
   }
-  // Extract the first three octets of the IP address to represent the subnet
-  const subnet = ip.split(".").slice(0, 3).join(".") + ".0";
-  console.log(`getSubnetFromIp: IP ${ip} converted to subnet ${subnet}`);
-  return subnet;
+
+  // Handle IPv4
+  if (ip.includes(".")) {
+    const octets = ip.split(".").map(Number);
+    if (maskBits >= 24) {
+      return octets.slice(0, 3).join(".") + ".0";
+    } else if (maskBits >= 16) {
+      return octets.slice(0, 2).join(".") + ".0.0";
+    } else {
+      return octets.slice(0, 1).join(".") + ".0.0.0";
+    }
+  }
+
+  // Handle IPv6 (basic)
+  return ip.split(":").slice(0, 4).join(":") + "::";
 };
 
 // Function to process attendance and send emails
@@ -354,18 +365,22 @@ app.post("/api/attendance/:attendanceId/send-notifications", async (req, res) =>
   }
 });
 
-const isSameSubnet = (clientIp, storedSubnet) => {
-  console.log(`isSameSubnet: Comparing client IP ${clientIp} with stored subnet ${storedSubnet}`);
-  if (!clientIp || !storedSubnet) {
-    console.log("isSameSubnet: Missing IP or subnet", { clientIp, storedSubnet });
-    return false;
-  }
-  const clientSubnet = getSubnetFromIp(clientIp);
-  const result = clientSubnet === storedSubnet;
-  console.log(`isSameSubnet: Client subnet ${clientSubnet} matches stored subnet ${storedSubnet}: ${result}`);
-  return result;
-};
+const isSameSubnet = (ip1, ip2, maskBits = 24) => {
+  if (!ip1 || !ip2) return false;
 
+  const subnet1 = getSubnetFromIp(ip1, maskBits);
+  const subnet2 = getSubnetFromIp(ip2, maskBits);
+
+  // Try different subnet masks for flexibility
+  const masks = [24, 20, 16];
+  for (const mask of masks) {
+    const s1 = getSubnetFromIp(ip1, mask);
+    const s2 = getSubnetFromIp(ip2, mask);
+    if (s1 === s2) return true;
+  }
+
+  return false;
+};
 // Update the device ID generation function to be more consistent
 const generateDeviceId = (userAgent) => {
   return crypto
