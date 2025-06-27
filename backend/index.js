@@ -28,7 +28,12 @@ app.use(cookieParser());
 mongoose.connect(process.env.MONGODB_URI || "", { useNewUrlParser: true, useUnifiedTopology: true });
 
 const FacultySchema = new mongoose.Schema({ name: String, email: String, clerkId: String });
-const ClassSchema = new mongoose.Schema({ name: String, facultyId: mongoose.Schema.Types.ObjectId });
+const ClassSchema = new mongoose.Schema({
+  name: String,
+  facultyId: mongoose.Schema.Types.ObjectId,
+  year: { type: Number, required: true },
+  branch: { type: String, required: true },
+});
 const StudentSchema = new mongoose.Schema({
   name: String,
   rollNo: String,
@@ -66,6 +71,23 @@ const Class = mongoose.model("Class", ClassSchema);
 const Student = mongoose.model("Student", StudentSchema);
 const Attendance = mongoose.model("Attendance", AttendanceSchema);
 const AttendanceLog = mongoose.model("AttendanceLog", AttendanceLogSchema);
+
+// Function to create default classes for a faculty
+const createDefaultClasses = async (facultyId) => {
+  const years = [1, 2, 3, 4];
+  const branches = ["CSE A", "CSE B", "CSE C", "ECE A", "ECE B", "ECE C"];
+
+  for (const year of years) {
+    for (const branch of branches) {
+      await Class.create({
+        name: `${year}st Year - ${branch}`,
+        facultyId,
+        year,
+        branch,
+      });
+    }
+  }
+};
 
 // Create email transporter
 const transporter = nodemailer.createTransport({
@@ -157,7 +179,14 @@ app.post("/api/faculty", async (req, res) => {
   faculty = new Faculty({ clerkId, name, email });
   await faculty.save();
 
-  res.json({ message: "User created successfully" });
+  // Create default classes for the new faculty
+  try {
+    await createDefaultClasses(faculty._id);
+    res.json({ message: "User created successfully with default classes" });
+  } catch (error) {
+    console.error("Error creating default classes:", error);
+    res.json({ message: "User created but failed to create default classes" });
+  }
 });
 app.get("/api/faculty/:clerkId", async (req, res) => {
   const { clerkId } = req.params;
@@ -169,9 +198,24 @@ app.get("/api/faculty/:clerkId", async (req, res) => {
 });
 
 app.post("/api/create-class", async (req, res) => {
-  const { name, facultyId } = req.body;
-  const newClass = await Class.create({ name, facultyId });
-  res.json(newClass);
+  const { name, facultyId, year, branch } = req.body;
+
+  if (!name || !facultyId || !year || !branch) {
+    return res.status(400).json({ error: "All fields are required" });
+  }
+
+  try {
+    const newClass = await Class.create({
+      name,
+      facultyId,
+      year: parseInt(year),
+      branch,
+    });
+    res.json(newClass);
+  } catch (error) {
+    console.error("Error creating class:", error);
+    res.status(500).json({ error: "Failed to create class" });
+  }
 });
 
 app.get("/api/students/:classId", async (req, res) => {
@@ -684,6 +728,70 @@ cloudinary.config({
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+});
+
+// Add new endpoint to create standard classes if they don't exist
+app.post("/api/create-standard-classes", async (req, res) => {
+  const { facultyId } = req.body;
+
+  try {
+    // Check if faculty already has any classes
+    const existingClasses = await Class.find({ facultyId });
+
+    if (existingClasses.length === 0) {
+      // Create standard classes only if no classes exist
+      await createDefaultClasses(facultyId);
+      res.json({ message: "Standard classes created successfully" });
+    } else {
+      res.json({ message: "Classes already exist" });
+    }
+  } catch (error) {
+    console.error("Error creating standard classes:", error);
+    res.status(500).json({ error: "Failed to create standard classes" });
+  }
+});
+
+// Add delete class endpoint
+app.delete("/api/classes/:classId", async (req, res) => {
+  try {
+    const { classId } = req.params;
+
+    // Find the class first to get its details
+    const classToDelete = await Class.findById(classId);
+    if (!classToDelete) {
+      return res.status(404).json({ error: "Class not found" });
+    }
+
+    // Get all attendance sessions for this class
+    const attendanceSessions = await Attendance.find({ classId });
+    const attendanceIds = attendanceSessions.map((session) => session._id);
+
+    // Delete all attendance logs for this class
+    await AttendanceLog.deleteMany({
+      attendanceId: { $in: attendanceIds },
+    });
+
+    // Delete all attendance sessions
+    await Attendance.deleteMany({ classId });
+
+    // Delete all students in this class
+    await Student.deleteMany({ classId });
+
+    // Finally, delete the class
+    await Class.findByIdAndDelete(classId);
+
+    res.json({
+      message: "Class and all associated data deleted successfully",
+      deletedClass: {
+        name: classToDelete.name,
+        year: classToDelete.year,
+        branch: classToDelete.branch,
+      },
+    });
+  } catch (error) {
+    console.error("Error deleting class:", error);
+    res.status(500).json({ error: "Failed to delete class and associated data" });
+  }
 });
 
 app.listen(5000, () => console.log("Server running on port 5000"));
